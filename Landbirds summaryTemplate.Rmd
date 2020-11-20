@@ -32,8 +32,8 @@ year <- 2019
 points<-NA
 
 # load in data
-NETN = importNETNbirds("~/R/Mulit-network/NCRNbirds/Data/NETN")
-tlu_GuildRatings <- read_excel("~/R/NETN/Landbirds/NETN_Landbirds/Look up tables/tlu_GuildRatings.xlsx")
+NETN = importNETNbirds("./Data/NETN")
+tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 
 # model data
 #The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years.It contains the estimated trend in species abundance after accounting for imperfect detection and effects of forest covariates. 
@@ -217,8 +217,7 @@ plotdata<-filter(sp_detects, AOU_Code %in% aou) %>%
    left_join(spp,., by = "AOU_Code") %>% 
     mutate(common = paste0(common, " (", order,")")) %>% 
     mutate(common = fct_reorder(common, order)) %>% 
-  left_join(., spMeanYearEffect, by=c("AOU_Code", "park")) %>% 
-  mutate(CI = )
+  left_join(., spMeanYearEffect, by=c("AOU_Code", "park")) 
   
 GraphOut<-ggplot(data=plotdata, aes(x = Year, y = value, color = variable))+expand_limits(y=0)+
       geom_point(data= dplyr::filter(plotdata, variable == "Field Observation"),size=2) + geom_line()+
@@ -239,7 +238,7 @@ GraphOut<-ggplot(data=plotdata, aes(x = Year, y = value, color = variable))+expa
       theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+facet_wrap(~common, ncol = 2, shrink= FALSE)
 
 GraphOut+
-  geom_text(data= dplyr::filter(plotdata, variable == "Trend Estimate"), show.legend = FALSE, aes(x = Inf, y = Inf, label = paste(round(mean,2)," (",round(lowCI,2),",",round(highCI,2),")"), hjust = 1.05,vjust   = 1))
+  geom_text(data= dplyr::filter(plotdata, variable == "Trend Estimate")  %>% distinct(common, park, variable, mean, lowCI, highCI), show.legend = FALSE, aes(x = Inf, y = Inf, label = paste(round(mean,2)," (",round(lowCI,2),",",round(highCI,2),")"), hjust = 1.05,vjust   = 1))
 
 ```
 
