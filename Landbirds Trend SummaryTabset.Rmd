@@ -1,6 +1,7 @@
 ---
 output: 
-    html_document
+    html_document:
+      fig_caption: yes
 ---
       
 ```{r setup, include=FALSE}
@@ -14,6 +15,7 @@ library(leaflet)
 library(cowplot)
 library(readxl)
 library(lubridate)
+library(plotly)
 
 network<-"NETN"
 Park<-"MORR"
@@ -21,7 +23,7 @@ year <- 2019
 points<-NA
 
 # load in data
-network = importNETNbirds("./Data/NETN") # needs to be fixed if multi-network
+BirdData <- importNETNbirds("./Data/NETN") # needs to be fixed if multi-network
 tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 
 # model data
@@ -41,57 +43,64 @@ spMeanYearEffect <- read.csv("./Data/spMeanYearEffect.csv") %>%
 
 guildsMeanTrends <-read.csv("./Data/guildsMeanTrends.csv") # guild-level annual model estimates
 
-guild_tlu<-getGuilds(network) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
+guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
 
 pointCommunity <- read.csv("./Data/point-rich-bci-by-year.csv")
  
 ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
  
-ParkList<-NCRNbirds::getParkNames(network, name.class="code")
+ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
 
 # derive raw detects and add on modeled estimates
-sp_detects<- SumRelAbund(network[ParkList == Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
+sp_detects<- SumRelAbund(BirdData[ParkList == Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
 
 
-minYear<-min(getBirds(network[ParkList == Park])$Year)
-maxYear<-max(getBirds(network[ParkList == Park])$Year)
+minYear<-min(getBirds(BirdData[ParkList == Park])$Year)
+maxYear<-max(getBirds(BirdData[ParkList == Park])$Year)
 
 ```
 
-Trends in Landbird monitoring at `r Park` {.tabset .tabset-fade}
+Recent trends in bird monitoring at `r getParkNames(BirdData[ParkList == Park], name.class = "long")` {.tabset .tabset-fade}
 ------------------------------------
 ### Monitoring program
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Effmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', fig.caption = "Map of monitoring effort at permanent sites", warning= FALSE, comment=FALSE, message=FALSE}
-mapEffort(network[ParkList == Park], palette = "viridis", title = paste0("Total surveys since ",minYear))
+mapEffort(BirdData[ParkList == Park], palette = "viridis", title = paste0("Total surveys since ",minYear))
 ```
 </div>
-<h3> Northeast Temperate Network's Long-term Landbird monitoring Program </h3>
+<h3> Long-term forest bird monitoring program </h3>
 
-<p>NETN's Breeding landbird monitoring protocol has been implemented since 2006 in 11 northeastern national parks in partnership with the <a href="https://vtecostudies.org/">Vermont Center of Ecostudies</a> and many volunteer birders. 
+<p> The Northeast Temperate Network's (NETN) breeding bird monitoring program has been implemented since 2006 in partnership with the <a href="https://vtecostudies.org/">Vermont Center of Ecostudies</a> and many volunteer birders. The program was established to determine status and trends in species composition of breeding landbirds in the park. </p>
 
-<p>This report summarizes park-level results from a recent trend analysis (Doser et al. 2020) which addressed the following  monitoring objectives:</p>
+<p>This report summarizes park-level forest bird monitoring results between `r minYear` and `r maxYear` in `r Park` for the following topics:</p>
 <ul>
- <li> Determine long-term trends in species composition of breeding landbirds in the park. </li> 
- <li> Determine changes in relative abundance of commonly detected and <a href="http://pif.birdconservancy.org/"> Partners in Flight Priority </a> species at each park, as determined by Bird Conservation Regions.</li> </ul>
-  
+ <li> <b>[Bird Diversity]:</b> Summary of the number of species detected since `r minYear` and across monitoring sites.</li> 
+ <li> <b>[Bird Community Index]:</b> Summary of the condition of the park's forest bird community.</li> 
+ <li> <b>[Species trends]:</b> Summary of bird abundance over time for a variety of selected species. </li> 
+ <li> <b>[Conclusions]</b> </li> 
+ <li> <b>[Supporting Resources]:</b> List of references and associated documentation for the bird monitoring program.</li> 
+ </ul>
+
 <h3>Methods</h3>
 
-<p>The analysis in this report is based on repeated visits to the permanent monitoring sites shown in the map. Each point is typically visited once or twice a year, during the late spring to mid-summer. At each visit all birds heard or seen during a 10-minute period are recorded. Additionally, the observers indicate an approximate distance to the bird, for example, between 50 to 100m meters away or further. For detailed information on the methods and analysis, please consult the monitoring protocol and associated references listed in the Citations tab. </p>
+<p> The analysis in this report is based on repeated visits to  permanent monitoring sites shown in the map to the right. Each point is typically visited once a year but occasionally twice, during the late spring to mid-summer during peak breeding. At each visit all birds heard or seen during a 10-minute period are recorded. Additionally, the observers indicate an approximate distance to the bird, for example, within 10 meters (~33 feet) or further. For detailed information on the methods and analysis, please consult the [Supporting Resources]. </p>
 
-<p>If you have questions about this program, report, or would like to acquire data or speak about bird monitoring in your park please
-contact NETN staff <a href="mailto:aaron_weed@nps.gov">Aaron Weed (Program Manager)</a>, <a href="mailto:ed_sharron@nps.gov">Ed Sharron (Bird Volunteer Coordinator)</a>, or <a href="mailto:adam_kozlowksi@nps.gov"> Adam Kozlowski (Data Manager)</a>.</p>
+<p> If you have questions about this program, report, or would like to acquire data or speak about bird monitoring in your park please contact NETN staff  <a href="mailto:ed_sharron@nps.gov"> Ed Sharron (Bird Volunteer Coordinator)</a>,  <a href="mailto:adam_kozlowksi@nps.gov"> Adam Kozlowski (Data Manager)</a>, or <a href="mailto: aaron_weed@nps.gov"> Aaron Weed (Program Manager)</a>.</p>
 
 ### Bird Diversity {.tabset}
 
+<p>  The number of detected species (or species richness) is a key metric from our monitoring because it provides a straight-forward indication of the birds that are likely using `r Park` as breeding habitat during the summer. The number of species may change over time due to many factors affecting the local area surrounding the park's forest (e.g., weather, forest cover, understory vegetation) or factors affecting bird populations at greater geographic scales, such as regional forest health and wintering habitat survival. </p> 
+
 #### No. of Species over time
 
-```{r richness, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'center'}
+<p> The graph below shows the number of bird species detected during monitoring each year (blue) and the number of species estimated after accounting for imperfect detection (green, see Doser et al. 2020). Note that this plot is not showing the total number of bird species in the park, as other species may be present but not detected during monitoring.</p>
+
+```{r richness, echo = TRUE, echo=FALSE, fig.height=4, fig.width= 10, fig.align = 'center', fig.cap= "Observed (blue) and estimated (green) species richness over time. Data are summarized to include detections within 100 meters of the observer."}
 
 plotdata<- dplyr::filter(ParkCommAnnual, park == Park) %>% select(Year= year, `Estimated Richness` = median.rich, low = low.95.rich, hi = high.95.rich) %>% 
-  left_join(., NCRNbirds::birdRichness(network[ParkList == Park], band= 1:2, byYear = TRUE), by = "Year") %>% rename(`Observed Richness` = Richness) 
+  left_join(., NCRNbirds::birdRichness(BirdData[ParkList == Park], band= 1:2, byYear = TRUE), by = "Year") %>% dplyr::rename(`Observed Richness` = Richness) 
 
 colors<- c("Field Observation" = "#2171b5","Estimated (95% C.I.)"= "dark green")
  
@@ -105,43 +114,63 @@ GraphOut<-ggplot(data=plotdata, aes(x = Year))+expand_limits(y=0)+
       theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
       theme(axis.text.x = element_text(color="black", size = 12))+
       scale_color_manual(values = colors)+
-      scale_x_continuous(breaks = seq(2006, 2019,1))+
+      scale_x_continuous(breaks = seq(2006, 2019,2))+
       labs(y=" Number of Species" ,x= "", color = "")+theme(legend.position = c(0.8,0.2))+ theme(legend.text = element_text(size = 14))
 
-GraphOut
+ggplotly(GraphOut)
 
 ```
 
-<h4> This graph shows the number of bird species observed during monitoring each year (blue) and the number of species estimated after accounting for imperfect detection (green, see Doser et al. 2020). Note that this plot is not showing  the total number of bird species in the park, as other species may be present but not detected during monitoring. Data are summarized among all annual visits to a site and include all species detected within 100 meters of each observer.</h4>
+<p> <b>There are two main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
+<ul>
+<li> The number of species has remained <b> unchanged </b> between `r minYear` to `r maxYear` in `r Park`. A total of 
+`r NCRNbirds::birdRichness(BirdData[ParkList == Park])` species has been detected with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year. It is important to note that the number of species <i>estimated</i> as shown in the graph (green) is typically higher than the number actually detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard). </li> 
 
+<li> The graph below shows trends in <i>estimated</i> species richness among all `r network` parks. While the number of forest bird species in `r Park` has not changed, it is one of 4 `r network` parks showing a slight (but non-significant) decline in estimated species richness over time. Species richness at `r Park` ranks in as #7 among the 11 eleven `r network` parks monitored. </li>
+</ul>
+
+
+```{r, richTrend, echo=F, fig.cap='Trends in estimated park-level species richness from 2006-2019 at each park. Points are the average species richness across all sites, gray regions denote the 95% credible intervals. Inset text is the median (95% credible interval) linear trend estimating change per year in species richness (Doser et al. 2020).'}
+knitr::include_graphics("Fig4.jpg")
+```
+
+
+```{r, richPark, echo=F}
+
+# rank order for species richness among parks
+plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == Park,"yes","no"))
+
+GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,Richness), y= Richness, fill= highlight))+geom_bar(stat = "identity", width=0.75)+
+ scale_fill_manual(values =c("#2171b5","red"), guide=FALSE)+
+  coord_flip()+
+  theme_classic()+  
+      theme(axis.title.x =element_text(size = 14, face ="bold"))+
+      theme(axis.text.y = element_text(color="black", size = 12))+
+      theme(axis.text.x = element_text(color="black", size = 12))+
+      labs(x="", y="Total Number of Species Detected")+
+  theme(legend.position = "none") +
+  labs(title= "Total number of species detected since monitoring began in each park.")
+
+
+ggplotly(GraphOut)
+```
 #### No. of Species among sites
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r richmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE, fig.cap= "Map of Species Richness at permanent sites"}
-mapRichness(network[ParkList == Park], title = "No. of species", palette = "viridis", band = 1:2)
+mapRichness(BirdData[ParkList == Park], title = "No. of species", palette = "viridis", band = 1:2)
 ```
 </div>
 
-<h4> This map shows the cumulative total number of species observed during field surveys per site since `r minYear`. Clicking on the site displays the unique site name and observed species richness.</h4>
+This map shows the cumulative total number of species observed during field surveys at each site since `r minYear`.
+
+<p> While no formal analysis has been completed, this map suggests that more species have been detected in the western area of the park, specifically along the Soldier's Huts Route. </p>
 
 ### Bird Community Index {.tabset}
 
-#### Over time
-<h3>Bird Community Index </h3>
+<p> The Bird Community Index (BCI- O'Connell et al. 1998, 2000) is an index designed to indicate the conservation status of the bird community in forested areas such as those in `r network` parks. It was developed for conservation of forest birds common within the Central Appalachian region but our analyses indicate that it is also applicable to and helpful for characterizing breeding birds in `r network` parks because of the similarity of species. To calculate the BCI, the list of birds from each site is considered separately. If a site has many bird species that are typically restricted to intact forest areas (&quot;forest obligates&quot;) the site gets a high score, whereas birds that live in a variety of areas (&quot;generalists&quot;) give a site a low score.</p>
 
-<p>The Bird Community Index (BCI- O'Connell et al 1998, 2000) is an index designed to indicate the conservation status of the bird community in
-forested areas such as those in NETN parks. To calculate this, the list of birds from each site is considered separately. If a site has many bird
-species that are typically restricted to intact forest areas (&quot;forest obligates&quot;) the site gets a high score, whereas birds that live in a
-variety of areas (&quot;generalists&quot;) give a site a low score.</p>
-
-<div style="float:right;position:relative;top:10px;padding:1px 1px 1px 1px;margin:0px 5px 10px 5px">
-```{r BCI, echo=FALSE, fig.height=4, fig.width= 8, fig.align = 'center', message=FALSE}
-NCRNbirds::BCIPlot(network[ParkList == Park], type= "Cent_Appal",  plot_title = "Average annual Bird Community Index across park", band = 1:2, caption = FALSE)
-```
-Data above are summarized from field observations within 100 meters of the observer. The points on the graph denote the BCI rating for points monitored during 2019. The horizontal axis indicates the year, with the number of points monitored by visit in parenthesis. 
-</div>
-
-<p>Many factors are used to assess the
+<p> Many factors are used to assess the
 degree to which a bird species is a generalist or a forest obligate. These
 include: </p>
 <p>
@@ -149,38 +178,89 @@ include: </p>
  <li>What habitat does the species prefer?</li>
  <li>Is the species restricted to the interior of forests?</li>
  <li>Where does the species nest (trees, shrubs, ground, etc)?</li>
- <li>What does the species eat (insects in bark, insect on the ground, omnivore,etc) </li>
- <li>Does the species a predator or parasite of other bird's nests?</li>
- <li>Is it an exotic species?</li>
- <li>Is the species resident year round or does it migrate?</li>
+ <li>What does the species eat (insects in bark, insect on the ground, omnivore,etc)? </li>
+ <li>Is the species a predator or parasite of other bird's nests?</li>
+ <li>Is the species exotic?</li>
+ <li>Is the species a park resident year-round or does it migrate?</li>
  <li>How many broods does the species raise per year?</li>
 </ul>
 </p>
-<p>Based on these assessments each point is assigned a score. The scores are then averaged for the entire park.
+<p>Based on these assessments each point is assigned a score. The scores are then averaged for the entire park in each year.
 This average score is used to categorize the bird community of the park as either Low, Medium, High or Highest Integrity. </p>
 
-#### BCI across park
-<h4> Bird Community Index ratings for permanent monitoring sites in `r year`. </h4>
+#### BCI over time
 
-```{r map, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'center', message=FALSE}
-mapBCI(network[ParkList == Park], band =2, type= "Cent_Appal", years = 2019)
+The graph below shows that the BCI rating at `r Park` has remained relatively unchanged since `r minYear` and is considered to be of "High Integrity' compared to other bird communities within the Central Appalachian region. 
+
+<div style="float:right;position:relative;top:10px;padding:1px 1px 1px 1px;margin:0px 5px 10px 5px">
+```{r BCI, echo=FALSE, fig.height=4, fig.width= 8, fig.align = 'center', message=FALSE}
+NCRNbirds::BCIPlot(BirdData[ParkList == Park], type= "Cent_Appal",  plot_title = "Average annual Bird Community Index across park", band = 1:2, caption = FALSE)
+
+```
+Data above are summarized from field observations within 100 meters of the observer. The points on the graph denote the BCI rating for points monitored during 2019. The horizontal axis indicates the year, with the number of points monitored by visit in parenthesis. 
+</div>
+
+#### BCI across park
+Bird Community Index ratings for permanent monitoring sites in `r year` showing variation in BCI across `r Park`. Similar to species richness, BCI is highest in the western portion of the park on our Soldier's Huts route.
+
+```{r BCIrichmap, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'center', message=FALSE}
+mapBCI(BirdData[ParkList == Park], band =2, type= "Cent_Appal", years = 2019)
 ```
 
 Data in the map are summarized from field observations within 100 meters of the observer. The points on the map denote the BCI rating for sites monitored during `r year`. Clicking on the site displays the unique site name and the BCI rating.
 
+
+#### BCI compared to other parks
+
+As of `r maxYear`, `r Park` has the 4th highest BCI rating in `r network`.  
+
+```{r, BCIPark, echo=F, fig.height=4, fig.width= 8, fig.align = 'center'}
+
+BCIPark<- map(BirdData, ~BCI(.x))
+
+parkdata<-BCIPark %>% map("BCI")%>% map_dbl(mean) %>% round(1) 
+
+plotdata<- data.frame(Admin_Unit_Code= ParkList, BCI=parkdata)
+
+plotdata<- plotdata  %>% arrange() %>% 
+  mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == Park,"yes","no"))
+
+GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,BCI), y= BCI, fill= highlight))+geom_bar(stat = "identity", width=0.75)+
+ scale_fill_manual(values =c("#2171b5","red"), guide=FALSE)+
+  coord_flip()+
+  theme_classic()+  
+      theme(axis.title.x =element_text(size = 14, face ="bold"))+
+      theme(axis.text.y = element_text(color="black", size = 12))+
+      theme(axis.text.x = element_text(color="black", size = 12))+
+      labs(x="", y="Average BCI score")+
+  theme(legend.position = "none") +
+  labs(title= "Average BCI score per park since monitoring began")
+
+
+ggplotly(GraphOut)
+```
+<p>
+<p>
+<p>
+The analysis by Doser et al. (2020)  concluded that the BCI rating varies per park and that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating as depicted below. 
+
+```{r, BCITrend, echo=F, fig.cap="Relationship between the estimated slope in bird abundance over time for each park and the average BCI at each park. (Doser et al. 2020). Vertical lines represent the 95% CI for the slope and horizontal lines represent the 95% CI for the BCI. Inset text is the estimated Pearson’s correlation coefficient (with 95% CI)."}
+knitr::include_graphics("trendBCIRelationship.jpg")
+```
+
 ### Species trends {.tabset}
 #### Relative Abundance
 
-<h4> Average number of birds per site of the 20 most commonly detected species in `r Park` </h4>. 
+Average number of birds per site of the 20 most commonly detected species in `r Park`.
 
-```{r top20,echo=FALSE,results='hide',fig.keep='all', cache= TRUE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+```{r top20,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
 
-aou<-SumRelAbund(network[ParkList == Park], max=T, sort=TRUE, abund = 20, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+aou<-SumRelAbund(BirdData[ParkList == Park], max=T, sort=TRUE, abund = 20, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
   
-spp<-getBirdNames(network[ParkList == Park], names= aou , out.style = "common") %>% 
+spp<-getBirdNames(BirdData[ParkList == Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2)
       
-plotdata<-SumRelAbund(network[ParkList == Park], max=T, AOU = aou, band = 1:2, CalcByYear =FALSE ) %>% 
+plotdata<-SumRelAbund(BirdData[ParkList == Park], max=T, AOU = aou, band = 1:2, CalcByYear =FALSE ) %>% 
   group_by(AOU_Code) %>% 
   summarise(mean = round(mean(RelAbund,na.rm=T),2), se = sd(RelAbund)/sqrt(n()), n= n()) %>% 
   left_join(spp,., by = "AOU_Code")
@@ -206,11 +286,11 @@ Data are summarized within 100 meters from the observer and from the maximum num
 #### Trends over time
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
-```{r top10trend,echo=FALSE,results='hide',fig.keep='all', cache= TRUE,  fig.height=4, fig.width= 6, fig.align = 'right', message=FALSE,warning = FALSE, comment=NA}
+```{r top10trend,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=4, fig.width= 6, fig.align = 'right', message=FALSE,warning = FALSE, comment=NA, fig.cap = "Estimated trend over time"}
 
-aou<-SumRelAbund(network[ParkList == Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+aou<-SumRelAbund(BirdData[ParkList == Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
   
-spp<-getBirdNames(network[ParkList == Park], names= aou , out.style = "common") %>% 
+spp<-getBirdNames(BirdData[ParkList == Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2)%>% 
     mutate(order= row_number())
       
@@ -226,7 +306,7 @@ coord_flip()+
 #geom_text(aes(label = sprintf("%0.2f", round(mean, digits = 2))), y = plotdata$mean, hjust= 1, vjust= 1,color = "black", size = 4)+
 #scale_y_continuous(expand = c(0,0),limits = c(0, max(plotdata$mean*1.1)))+ #set origin at 0, sets width of x axis
 xlab("") +
-ylab(paste("Estimated trend over time : Birds per point per year", "\u00B1", " 95% C.I."))+ 
+ylab(paste("Birds per point per year", "\u00B1", " 95% C.I."))+ 
 theme_classic()+
 theme(axis.text.y = element_text(color="black",size = 12))+
 theme(axis.text.x = element_text(color="black",size = 12))+
@@ -239,34 +319,37 @@ BarChart
 ```
 </div>
 
-To the right are the plotted trend estimates for top 10 most abundant species in the park from Doser et al. (2020). Populations in the park are stable when the trend estimate error bars, or credible intervals (C.I.), do not overlap 0 (e.g. Eastern Wood-Pewee). The rank order of abundance in the park is denoted in parentheses following the species name. None of the most abundant species are increasing over time in the park but 6 of 10 species have stable populations. Scarlet Tanager, American Robin, Blue Jay, and Tufted Titmouse detections declined significantly during the monitoring period from `r minYear ` - `r maxYear `.
+To the right are the plotted trend estimates for top 10 most abundant species in the park from Doser et al. (2020). Populations in the park are stable when the trend estimate error bars, or credible intervals (C.I.), do not overlap zero (e.g. Eastern Wood-Pewee). The rank order of abundance in the park is denoted in parentheses following the species name. None of the most abundant species are increasing over time in the `r Park` but 6 of 10 species have stable populations. Scarlet Tanager, American Robin, Blue Jay, and Tufted Titmouse detections declined significantly during the monitoring period from `r minYear ` - `r maxYear `.
 
 #### Species plots
 
-Here are the average annuals counts and associated trends of the top 10 most abundant species detected since `r min(getBirds(network[ParkList == Park])$Year)` across the park over time and showing the trend. Plots show the average annual abundance of bird observations within 100 meters of the observer among sites. During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit in a year. The estimate of the trend (95% C.I.) is denoted in the upper right of each panel. If the interval does  not contain 0 the trend is statistically decreasing over time (e.g., Tufted Titmouse).
+Below are the average annual counts and significant trends of the top 10 most abundant species detected since `r minYear` across the park over time. Plots show the average annual abundance of bird observations within 100 meters of the observer among sites. During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit in a year. The estimate of the trend (95% C.I.) is denoted in the upper right of each panel. If the interval does  not contain zero the trend is statistically significant over time (e.g., Blue Jay).
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=16, fig.width= 10, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
 
 #Get Top 10 species
-aou<-SumRelAbund(network[ParkList == Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code
+aou<-SumRelAbund(BirdData[ParkList == Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code
 
-spp<-getBirdNames(network[ParkList == Park], names= aou , out.style = "common") %>% 
+spp<-getBirdNames(BirdData[ParkList == Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2) %>% 
     mutate(order= row_number())
 
 #subset sp_detects    
 
-plotdata<-filter(sp_detects, AOU_Code %in% aou) %>% 
-   left_join(spp,., by = "AOU_Code") %>% 
+plotdata<-
+   left_join(spp,sp_detects, by = "AOU_Code") %>% 
     mutate(common = paste0(common, " (", order,")")) %>% 
     mutate(common = fct_reorder(common, order)) %>% 
-  left_join(., spMeanYearEffect, by=c("AOU_Code", "park")) %>% 
-   group_by(common, variable) %>%
-    mutate(sig= between(0,lowCI,highCI))# determine in CI contains 0; returns TRUE
+   left_join(.,spMeanYearEffect, by= c("AOU_Code","park")) %>% 
+    group_by(common) %>% 
+    mutate(Nonsig= between(0,lowCI,highCI)) %>% # determine in CI contains 0; returns TRUE
+    filter(AOU_Code %in% aou) 
 
 GraphOut<-ggplot(data=plotdata, aes(x = Year, y = value, color = variable))+expand_limits(y=0)+
-      geom_point(data= dplyr::filter(plotdata, variable == "Field Observation"),size=2) + geom_line(data = filter(plotdata,sig == FALSE | variable == "Field Observation"))+
+      geom_point(data= dplyr::filter(plotdata, variable == "Field Observation"),size=2) + 
+      geom_line(data= dplyr::filter(plotdata, variable == "Field Observation"))+
+      geom_line(data = filter(plotdata, Nonsig == FALSE & variable == "Trend Estimate")) +
       #geom_errorbar(aes(ymin= mean-se, ymax= mean +se), width = .2, color = "#2171b5")+
       theme_classic()+
       theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
@@ -289,6 +372,10 @@ GraphOut+
 
 ```
 </div>
+
+### Conclusions
+
+
 
 ### Supporting Resources
 
