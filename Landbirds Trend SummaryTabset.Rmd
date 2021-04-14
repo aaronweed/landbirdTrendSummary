@@ -1,7 +1,10 @@
 ---
-output:
+output: 
+ 
   html_document:
     fig_caption: yes
+    
+always_allow_html: true
 ---
       
 ```{r setup, include=FALSE}
@@ -27,8 +30,9 @@ BCRName<-"Appalachian"
 BirdData <- importNETNbirds("./Data/NETN") # needs to be fixed if multi-network
 tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 
-# model data
-#The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years.It contains the estimated trend in species abundance after accounting for imperfect detection and effects of forest covariates. 
+##### import data estimated from Doser et al. 2021----
+
+#The files "spMeanTrends.csv" and "spMeanYearEffect.csv" contains the model estimates from Doser et al. 2021. spMeanYearEffect.csv contain the estimated change in abundance every four years on the log-scale after accounting for imperfect detection and effects of forest covariates. spMeanTrends.csv contain the annual estimates from the trend. The trend is for every four years as a result of standardizing the year variable in the model (which was necessary to get the model to converge with the other forest covariates in the model). It turns out the standard deviation of the year covariate was right around four (3.98), hence the interpretation of the trend parameter for every four years. 
 
 spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>% 
   pivot_longer(cols= 3:11, names_to = "park") %>% 
@@ -42,25 +46,26 @@ spMeanYearEffect <- read.csv("./Data/spMeanYearEffect.csv") %>%
   rename(AOU_Code= species) %>% 
   dplyr::filter(park == Park)
 
-guildsMeanTrends <-read.csv("./Data/guildsMeanTrends.csv") # guild-level annual model estimates
-
-guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
+guildsMeanTrends <-read.csv("./Data/guildsMeanTrends.csv") # guild-level 4-year log model estimates
 
 pointCommunity <- read.csv("./Data/point-rich-bci-by-year.csv")
  
 ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
- 
+
+##### Import and create some look-ups ----
+guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
+
 ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
 
 PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% 
   filter(BCR %in% bcr)
 
-# derive raw detects and add on modeled estimates
+##### Derive relative abundance and add on Doser's modeled estimates ----
 sp_detects<- SumRelAbund(BirdData[ParkList == Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
 
-
+# Define min and max years from monitoring
 minYear<-min(getBirds(BirdData[ParkList == Park])$Year)
 maxYear<-max(getBirds(BirdData[ParkList == Park])$Year)
 
@@ -70,7 +75,7 @@ Recent trends in bird monitoring at `r getParkNames(BirdData[ParkList == Park], 
 ------------------------------------
 ### Overview
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
-```{r Effmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', fig.caption = "Map of monitoring effort at permanent sites", warning= FALSE, comment=FALSE, message=FALSE}
+```{r Effmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', fig.cap = "Map of monitoring effort at permanent sites", warning= FALSE, comment=FALSE, message=FALSE}
 NCRNbirds::mapEffort(BirdData[ParkList == Park], palette = "viridis", title = paste0("Total surveys since ",minYear))
 ```
 </div>
@@ -182,7 +187,7 @@ include: </p>
  <li>What habitat does the species prefer?</li>
  <li>Is the species restricted to the interior of forests?</li>
  <li>Where does the species nest (trees, shrubs, ground, etc)?</li>
- <li>What does the species eat (insects in bark, insect on the ground, omnivore,etc)? </li>
+ <li>What does the species eat (insects in bark, insect on the ground, omnivore, etc)? </li>
  <li>Is the species a predator or parasite of other bird's nests?</li>
  <li>Is the species exotic?</li>
  <li>Is the species a park resident year-round or does it migrate?</li>
@@ -194,7 +199,7 @@ This average score is used to categorize the bird community of the park as eithe
 
 #### BCI over time
 
-Figure 4 shows that the BCI rating at `r Park` has remained relatively unchanged since `r minYear` and is considered to be of "High Integrity' compared to other bird communities within the Central Appalachian region. 
+Figure 4 shows that the BCI rating at `r Park` has remained relatively unchanged since `r minYear` and is of "High Integrity' compared to other bird communities within the Central Appalachian region. 
 
 <div style="float:right;position:relative;top:10px;padding:1px 1px 1px 1px;margin:0px 5px 10px 5px">
 ```{r BCI, echo=FALSE, fig.height=4, fig.width= 8, fig.align = 'center',fig.cap= "Figure 4. Average annual Bird Community Index across park. Data above are summarized from field observations within 100 meters of the observer. The horizontal axis indicates the year, with the number of points monitored by visit in parenthesis.", message=FALSE}
@@ -205,10 +210,10 @@ NCRNbirds::BCIPlot(BirdData[ParkList == Park], type= "Cent_Appal",  plot_title =
 </div>
 
 #### BCI across park
-Bird Community Index ratings for permanent monitoring sites in `r year` are shown below across `r Park`. Similar to species richness, BCI is highest in the western portion of the park on the Soldier's Huts route.
+Bird Community Index ratings for permanent monitoring sites from `r minYear` to `r maxYear` are shown below across `r Park`. BCI scores are fairly uniform across the park and mainly of High Integrity (76%). Seven of 29 (24%) monitoring sites were rated as Medium Integrity compared to other birds in the region.  While most of these sites are located near the park boundary, they were not necessarily near a forest edge. Overall, this is excellent news and means that specialist forest birds are breeding across the park. 
 
 ```{r BCIrichmap, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'center', message=FALSE}
-mapBCI(BirdData[ParkList == Park], band =2, type= "Cent_Appal", years = 2019)
+mapBCI(BirdData[ParkList == Park], band =2, type= "Cent_Appal", years = minYear:maxYear)
 ```
 
 Data in the map are summarized from field observations within 100 meters of the observer. The points on the map denote the BCI rating for sites monitored during `r year`. Clicking on the site displays the unique site name and the BCI rating.
@@ -216,7 +221,7 @@ Data in the map are summarized from field observations within 100 meters of the 
 
 #### BCI compared to other parks
 
-As of `r maxYear`, `r Park` has the 4th highest BCI rating in `r network` (Figure 5). The trend analysis concluded that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating (Doser etal. 2021) (Figure 6).   
+As of `r maxYear`, `r Park` has the 4th highest BCI rating in `r network` (Figure 5). The trend analysis concluded that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating (Doser et al. 2021) (Figure 6).   
 
 ```{r, BCIPark, echo=F, fig.height=4, fig.width= 8, fig.align = 'center', fig.cap= "Figure 5. Average BCI score per park since monitoring began"}
 
@@ -312,12 +317,14 @@ PIFinPark<- getChecklist(BirdData[ParkList == Park], out.style = "AOU", band=1:2
 
 plotdata<-filter(spMeanYearEffect, AOU_Code %in% aou) %>% 
    left_join(spp,., by = "AOU_Code") %>% 
-    mutate(common = fct_reorder(common, order)) %>% 
+    mutate(common = forcats::fct_reorder(common, order)) %>% 
     mutate(common = paste0(common, " (", order,")")) %>% 
   left_join(.,PIFSppByBCR, by= "AOU_Code") %>% # add PIF Designations
   mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
   mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
-  mutate(common2 = fct_reorder(common2, mean))
+  mutate(common2 = forcats::fct_reorder(common2, mean)) %>% 
+  mutate(mean_Per = paste(round((1-exp(mean))*100),"%")) # calc 1-exp(trend) to determine % change every 4 years
+
 
 BarChart<-ggplot(data= plotdata, aes(x=common2, y = mean)) +
 geom_bar(fill="#2171b5", stat="identity",width=0.75) +
@@ -348,13 +355,13 @@ BarChart
 
 ##### <b>Across the network</b>
 
-<p> Trends in the abundance of all species combined across the network did not change over time (Figure 9A) but the trend varied widely across parks (Figure 9B). For instance, the number of birds detected across all species has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
+<p> Trends in the abundance of all species combined across the network has not changed since 2006 (Figure 9A) but the trend varied widely across parks (Figure 9B). For instance, the number of birds detected across all species has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
 
 <p> In parks with significant decreasing or increasing trends, most species generally showed a similar trend to the overall park trend, but typically only a fraction of the species-specific trends were significantly different from zero. For example, while monitoring data suggest that 46 species are in decline at `r Park`, only 9 of these were actually significant trends. However, in parks where abundance has remained constant, there tended to be a split in the direction of the trends among species (e.g., SAGA and MIMA, Figure 9C) with most trends being non-significant.</p>
 
 <p> In `r Park`, the abundance of most species between `r minYear` to `r maxYear` appears to be in decline(Figure 9C). Nine species were estimated to have declined in the park while Northern Flicker increased significantly during monitoring. The overwhelming majority of species showing a decline at `r Park` is concerning, but species-specific trends need further evaluation since for some species declines may occur due to natural forest succession (Holmes and Sherry 2001 ) whereas others may be negatively impacted by human-caused stressors such as forest fragmentation and invasive species. </p>
 
-```{r, NETNtrends,echo=F, fig.cap= "Figure 9. Trends in bird abundance from 2006-2019. Panel (a) shows the linear trend of year across the entire network with the 95% credible interval in parentheses. The trend estimates represent the average change in abundance per point <strong>every four years</strong>. Error in the trend estimate is denoted in parentheses. Abundance is stable when the interval does not overlap zero. Panel (b) shows the park level trends. Red highlight indicates a significant negative year trend, white highlight indicates no significant trend, and blue highlight indicates positive significant trend. Panel (c) shows the number of species with linear trend of year estimates that are negative (red) and positive (blue) within each park. The number of species with significant trends is shown in boldface in parentheses. From Doser et al. (2021)."}
+```{r, NETNtrends,echo=F, fig.cap= "Figure 9. Trends in bird abundance from 2006-2019. Panel (a) shows the linear trend of year across the entire network with the 95% credible interval in parentheses. The trend estimates represent the average change in abundance on the <strong> log scale  </strong> per point <strong>every four years</strong>. Error in the trend estimate is denoted in parentheses. Abundance is stable when the interval does not overlap zero. Panel (b) shows the park level trends. Red highlight indicates a significant negative year trend, white highlight indicates no significant trend, and blue highlight indicates positive significant trend. Panel (c) shows the number of species with linear trend of year estimates that are negative (red) and positive (blue) within each park. The number of species with significant trends is shown in boldface in parentheses. From Doser et al. (2021)."}
 knitr::include_graphics("Fig3.jpg")
 ```
 
@@ -419,11 +426,11 @@ knitr::include_graphics("NETN_landbirdLogo.jpg")
 ```
 </div>
 
-The NETN monitoring program has determined that the forest resources at `r Park` provide critically important breeding habitat for a diversity of songbirds indicating that stewardship practices that maintain a healthy and diverse forest creates the best potential for a thriving bird community. One of the most important findings from our recent analysis is that bird abundance increases with the amount of forest area surrounding it. Despite the intricate and diverse breeding requirements of each individual species at `r Park`, it is clear that the `r NCRNbirds::birdRichness(BirdData[ParkList == Park])`  species detected during monitoring are directly influenced by the presence of forest cover (Doser et al. 2021).
+The NETN monitoring program has determined that the forest resources at `r Park` provide critically important breeding habitat for a diversity of songbirds indicating that stewardship practices that maintain a healthy and diverse forest creates the best potential for a thriving bird community. One of the most important findings from our recent analysis is that bird abundance increases with the amount of forest area surrounding it. Despite the intricate and diverse breeding requirements of each individual species at `r Park`, the `r NCRNbirds::birdRichness(BirdData[ParkList == Park])`  species detected during monitoring are directly influenced by the presence of forest cover (Doser et al. 2021).
 
-The Bird Community Index analysis suggested that the forest bird community at `r Park` is relatively healthy within the network, ranking 4th among the parks analyzed and scoring as <ins>High Integrity</ins> as compared to the broader Appalachian ecoregion. This is a good sign and means that the bird community at `r Park` is diverse, comprised of many forest specialist species and few non-native species. However, the trend analysis suggests that the overall number of songbirds breeding in the park has declined since monitoring began and this pattern seems to be driven by declines in regionally common species such as Blue Jay, American Robin and Tufted Titmouse. While it may seem like abundance and BCI should track similarly over time, BCI is based on the diversity of species and its calculation is independent of abundance. Our monitoring data suggest that while common, often more generalist species are in decline at `r Park`, forest specialist species of regional conservation importance such as Wood Thrush, Eastern Towhee, Eastern Wood Pee-Wee, and Ovenbird appear to be thriving at the park for now. On the other hand, the decline of Scarlet Tanager in the park is concerning and requires further inquiry.
+The Bird Community Index analysis suggested that the forest bird community at `r Park` is relatively healthy within the network, ranking 4th among the parks analyzed and scoring as <ins>High Integrity</ins> as compared to the broader Appalachian ecoregion. This is a good sign and means that the bird community at `r Park` is diverse, comprised of many forest specialist species and few non-native species. However, the trend analysis suggests that the overall number of songbirds breeding in the park has declined since monitoring began and this pattern seems to be driven by declines in regionally common species such as Blue Jay, American Robin, and Tufted Titmouse. While it may seem like abundance and BCI should track similarly over time, BCI is based on the diversity of species and its calculation is independent of abundance. Our monitoring data suggest that while common, often more generalist species are in decline at `r Park`, forest specialist species of regional conservation importance such as Wood Thrush, Eastern Towhee, Eastern Wood Pee-Wee, and Ovenbird appear to be thriving at the park for now. On the other hand, the decline of Scarlet Tanager in the park is concerning and requires further inquiry.
 
-While the results presented here suggest that `r Park` provides critical breeding habitat to a diversity of specialist species that is comparable to other healthy forests in the region, there are a number of concerns regarding the state and direction of forest health at `r Park` that have direct bearing on the future habitat for these species at the park. Invasive species have increased over time (Miller et al. 2020) and high deer browse has limited natural levels of forest regeneration (REF). Both of these stressors will likely affect the songbird community over time because forest regeneration not only replaces future canopy trees, but also creates structure in the understory and mid-story, which is important for breeding songbird nesting and foraging. Management activities that maintain forest cover, a healthy forest understory layer, and a diverse age structure will provide many benefits to the forest birds breeding at `r Park`. Actions to address species-specific trends at `r Park` will need further evaluation and consideration of all factors affecting their ecology, which may extend beyond the park (e.g., survival during migration, regional forest fragmentation).
+While the results presented here suggest that `r Park` provides critical breeding habitat to a diversity of specialist species that is comparable to other healthy forests in the region, there are a number of concerns regarding the state and direction of forest health at `r Park` that have direct bearing on the future habitat for these species at the park. Invasive species have increased over time (Miller et al. 2020) and high deer browse has limited natural levels of forest regeneration (REF). Both stressors will likely affect the songbird community over time because forest regeneration not only replaces future canopy trees, but also creates structure in the understory and mid-story, which is important for breeding songbird nesting and foraging. Management activities that maintain forest cover, a healthy forest understory layer, and a diverse age structure will provide many benefits to the forest birds breeding at `r Park`. Actions to address species-specific trends at `r Park` will need further evaluation and consideration of all factors affecting their ecology, which may extend beyond the park (e.g., survival during migration, regional forest fragmentation).
 
 ### Supporting Resources
 
