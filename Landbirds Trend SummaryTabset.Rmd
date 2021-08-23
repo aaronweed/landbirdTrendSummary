@@ -9,9 +9,11 @@ output:
 params:
   network: NETN
   Park: MORR
+  state: NJ
   year: 2019
   bcr: 28
   BCRName: Appalachian Mountains
+  BBSRegion: S28
   minYear: 2006
   maxYear: 2019
 ---
@@ -28,6 +30,9 @@ library(cowplot)
 library(readxl)
 library(lubridate)
 library(plotly)
+library(knitr)
+library(kableExtra)
+library(formattable)
 
 # network <- params$network
 # Park <- params$Park
@@ -38,7 +43,8 @@ library(plotly)
 # minYear<-params$minYear
 # maxYear<-params$maxYear
 
-# load in monitoring data and look-up tables
+
+# load in network monitoring data and look-up tables
 
 BirdData <- importNETNbirds("./Data/NETN") # needs to be fixed if multi-network
 tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
@@ -70,6 +76,15 @@ ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
 sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
+
+
+# load in USGS BBS recent survey and analysis results (https://www.sciencebase.gov/catalog/item/5f1836a482cef313ed843104)
+#Sauer, J.R., Link, W.A., and Hines, J.E., 2020, The North American Breeding Bird Survey, Analysis Results 1966 - 2019: U.S. Geological Survey data release, https://doi.org/10.5066/P96A7675.
+
+BBS_annual<-read.csv("./Data/Index_Best_1966-2019_core.csv") # load in BBS annual index    1966-2019 results
+
+BBS_trends<-read.csv("./Data/BBS_1966-2019_core_trend_best.csv")%>% rename(common= Species.Name) # load in BBS trends estimates for 1966-2019 results
+  
 ```
 <img src="NETN_Birdlogo_100.jpg" alt="landbird logo" style="height:100px;width:100.8px;float:right;padding:0;margin:10px -15px 0 0;">
 
@@ -278,7 +293,7 @@ Monitoring the status and trends of breeding birds in `r params$network` parks i
 # generate species detected in park against PIF checklist (does not print)
 
 PIFSpecies<- getChecklist(BirdData[ParkList == params$Park], out.style = "AOU", band=1:2) %>% 
-  tibble() %>% rename(AOU_Code = 1) %>% 
+  as_tibble() %>% rename(AOU_Code = 1) %>% 
   left_join(.,PIFSppByBCR, by="AOU_Code") %>% # add PIF Designations
   mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
   filter(PIF == "*") 
@@ -289,7 +304,7 @@ PIFSpecies<- getChecklist(BirdData[ParkList == params$Park], out.style = "AOU", 
 aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 20, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
   
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
-    bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2)
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)
       
 plotdata<-SumRelAbund(BirdData[ParkList == params$Park], max=T, AOU = aou, band = 1:2, CalcByYear =FALSE ) %>% 
   group_by(AOU_Code) %>% 
@@ -326,7 +341,7 @@ Figure 7. Relative abundance of the 20 most commonly detected species at `r para
 aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
   
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
-    bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2)%>% 
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
     mutate(order= row_number())
       
 plotdata<-filter(spMeanYearEffect, AOU_Code %in% aou) %>% 
@@ -390,13 +405,13 @@ knitr::include_graphics("Fig3.jpg")
 Below are plots of relative abundance over time and associated trends (black line) when statistically significant (Doser et al. 2021) for the top 10 most abundant species detected since `r params$minYear` across `r params$Park`.
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
-```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=16, fig.width= 10, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA, fig.cap= "Figure 10. Relative abundance per year and associated trends over time (line) for the top 10 most abundant species detected across the park. Data exclude observations of species/individuals not suspected to be breeding in the forest (e.g., flyovers). During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit among all sites in a year. The estimate of the trend (log-scale with 95% C.I.) is denoted in the upper right of each panel. If the interval does <ins>not</ins> contain zero the trend is statistically significant over time and plotted for that species (e.g., Blue Jay). Rank order of abundance is denoted in parentheses following each species name." }
+```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=12, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA, fig.cap= "Figure 10. Relative abundance per year and associated trends over time (line) for the top 10 most abundant species detected across the park. Data exclude observations of species/individuals not suspected to be breeding in the forest (e.g., flyovers). During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit among all sites in a year. The estimate of the trend (log-scale with 95% C.I.) is denoted in the upper right of each panel. If the interval does <ins>not</ins> contain zero the trend is statistically significant over time and plotted for that species (e.g., Blue Jay). Rank order of abundance is denoted in parentheses following each species name." }
 
 #Get Top 10 species
 aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code
 
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
-    bind_cols(.,aou ) %>% tibble() %>% rename(common = 1, AOU_Code =2) %>% 
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2) %>% 
     mutate(order= row_number())
 
 #subset sp_detects    
@@ -444,14 +459,123 @@ GraphOut+
 ```
 </div>
 
+#### Comparison to Regional Trends
+
+The table below compares the trends of common species detected at `r params$Park` to the trend analysis results from the <b> North American Breeding Bird Survey (BBS) </b> within the relevant Bird Conservation Region and State from 1966 - 2019 (Sauer et al. 2020). Note that the period of time used to estimate the trends for each species differ. 
+
+Monitoring data suggest that the top 4 species encountered at `r params$Park` appear to be in decline at the park and in the surrounding region with the exception of Ovenbird, which has been increasing in abundance across the `r params$BCRName` region since 1966. Trends in park-scale abundance are generally consistent with BBS results at the BCR-scale (6 of 10 species) and state-scale (7 of 10) but with a few exceptions. For example, NETN monitoring has noted decreases in Scarlet Tanager, Red-bellied Woodpecker, and Tutted Titmouse since `r params$minYear` but these species appear to be either stable or increasing in BBS surveys in `r params$state`and across the `r params$BCRName` region. 
+
+NETN monitoring has indicated that Blue Jay, American Robin, Tufted Titmouse and Scarlet Tanager have undergone a statistically significant decline at `r params$Park`. These trends are concerning to park management because common species such as Blue Jay and American Robin are in decline regionally and because other common species like Tufted Titmouse and Scarlet Tanager are in decline at the park but not within the region. It is possible that the discrepancy in the trend results are related to short-term changes in the population surveying period. 
+
+```{r BBStable, echo= FALSE, results = 'asis', message=FALSE, warning = FALSE}
+
+## derive fields from BBS trend data
+
+BBS_trends<- BBS_trends %>% 
+  mutate(Sig = ifelse(X2.5.CI > 0 | X97.5.CI < 0, "*", "n.s.")) %>% 
+  mutate(trend_dir = ifelse(Trend > 0,"Increase", "Decrease"))
+            
+
+# Create trend data from NETN monitoring (rewritten from above)
+
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+  
+spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
+    mutate(order= row_number())
+      
+NETNdata<-filter(spMeanYearEffect, AOU_Code %in% aou) %>% 
+   left_join(spp,., by = "AOU_Code") %>% 
+    #mutate(common = fct_reorder(common, order)) %>% 
+  left_join(.,PIFSppByBCR, by= "AOU_Code") %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
+  mutate(Sig = ifelse(lowCI > 0 | highCI < 0, "*", "n.s.")) %>% 
+  mutate(common2 = fct_reorder(common2, mean)) %>% 
+  mutate(trend_dir = ifelse(mean > 0, "Increase", "Decrease")) %>% 
+  add_column(Region = paste0("MORR ", params$minYear, " - ", params$maxYear)) %>% 
+  dplyr::select(`Common Name`= common, Region, Sig, trend_dir)
+
+
+## Combine BBS and NPS data
+
+sp<- c(spp$common) # create list of species detected by NPS to subset BBS data for
+
+BBSData<-  mutate(BBS_trends, common = stringr::str_squish(common)) %>% # remove white space from common names for filtering
+  mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
+  mutate(Region.Name = stringr::str_squish(Region.Name)) %>% # remove white space from region names for presentation
+  dplyr::filter(Region == params$BBSRegion | Region == params$state) %>% # subset data by BCR region of interest 
+  dplyr::filter(common %in% sp) %>%  # extract the species of interest
+    mutate(Region = paste0(Region.Name, " 1966 - 2019")) %>% 
+  dplyr::select(`Common Name` = common, Region, Sig, trend_dir)
+
+TableData<- bind_rows(NETNdata, BBSData) %>%  
+  mutate(Trend = paste0(trend_dir, " , ", Sig)) %>% dplyr::select(-Sig, -trend_dir) %>% 
+  mutate(Trend = case_when(
+                  Trend == "Decrease , *"  ~ cell_spec(Trend, "html", color = "red", bold = T),
+                  Trend == "Decrease , n.s." ~ cell_spec(Trend, "html", color = "red", bold = F),
+                  Trend == "Increase , *"  ~ cell_spec(Trend, "html", color = "green", bold = T),
+                  Trend == "Increase , n.s." ~ cell_spec(Trend, "html", color = "green", bold = F))) %>% 
+  pivot_wider(names_from = "Region", values_from= Trend) %>% 
+  left_join(.,PIFSppByBCR, by= c(`Common Name` = "Common_Name")) %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), `Common Name`, paste(PIF,"",`Common Name`))) %>% 
+  dplyr::select(Species= common2,`MORR 2006 - 2019`,`Appalachian Mountains 1966 - 2019`, `New Jersey 1966 - 2019`)
+  
+
+
+kableExtra::kbl(TableData, escape = FALSE, align= "c", caption = paste0("Comparison of park trends to regional USGS Breeding Bird Survey data for the most commonly detected species at ", params$Park, ". * denotes a statistically significant increase or decrease in abundance; n.s. = non-significant. Asterisks next to a species name denote species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020)."))%>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
+```
+
+```{r BBSplots, echo= FALSE, results = 'hide', fig.keep='all', cache= FALSE,  fig.height= 12, fig.width = 8, fig.align = 'center', message=FALSE, warning = FALSE, comment=NA, fig.cap= "Figure 11. Annual index reported by the NA BBS (sauer et al. 2020)"}
+
+BBS_tlu<- BBS_trends %>% distinct(AOU, common, Region, Region.Name) %>% 
+ mutate(common = stringr::str_squish(common)) %>% # remove white space from common names for filtering
+ mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
+ mutate(Region.Name = stringr::str_squish(Region.Name)) %>% # remove white space from region names for presentation
+  dplyr::filter(Region == params$BBSRegion | Region == params$state) %>% # subset data   by BCR region of interest 
+  dplyr::filter(common %in% sp) %>%  # extract the species of interest
+  dplyr::select(AOU, `Common Name` = common, Region, Region.Name)
+
+plotdata<-BBS_annual %>% 
+  mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
+ left_join( BBS_tlu,., by= c("AOU", "Region")) %>% 
+  mutate(Index= as.numeric(Index), lowCI = as.numeric(`X2.5.CI`), hiCI= as.numeric(`X97.5.CI`))
+
+GraphOut<-ggplot(data=plotdata, aes(x = Year, y = Index, color = Region.Name))+expand_limits(y=0)+
+      geom_line(size = 1.5)+
+      #geom_ribbon(aes(ymin= Index - lowCI, ymax= Index + hiCI, color= Region), width = .2, color = "grey70")+
+      theme_classic()+
+      theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.title.x =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
+      theme(axis.text.x = element_text(color="black", size = 10))+
+      scale_x_continuous(breaks = seq(1966, 2019,10)) +
+      scale_color_manual(values = c("#2171b5", "black"))+
+      labs(y="Annual BBS Idex" , color = "")+
+      theme(legend.position = "top")+ 
+      theme(legend.text = element_text(size = 12))+
+       theme(panel.background =  element_rect(fill="white", colour="black")) +
+       theme(plot.title=element_text(size=12, vjust=2, face= "bold")) +
+       theme(strip.background= element_rect(size=10, color="gray", linetype ="solid" ))+
+      theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+
+      facet_wrap(~`Common Name`, ncol = 2, shrink= FALSE, scales = "free_y")
+
+GraphOut
+```
+
+
+
+
 ### Conclusions
 
-```{r exotics, echo=FALSE, results='hide',}
+```{r exotics, echo=FALSE, results='hide', message=FALSE, warning = FALSE}
 
 # did you detect exotics in park? (won't print)
 
 exotics<-getGuilds(BirdData[ParkList == params$Park]) %>% filter(Response_Guild == "Exotic") %>% select(AOU_Code)
-sp_obs<-getChecklist(BirdData[ParkList == params$Park]) %>%  tibble() %>% rename(AOU_Code = 1)
+sp_obs<-getChecklist(BirdData[ParkList == params$Park]) %>%  as_tibble() %>% rename(AOU_Code = 1)
 
 semi_join(exotics,sp_obs)
 
@@ -473,7 +597,7 @@ knitr::include_graphics("Fig6.jpg")
 Figure 11. Relationship between average number of birds of a single species per site (y-axis) and (a) tree basal area, (b) percent forest within a 1km radius around each site, and (c) forest regeneration. Site-level basal area and regeneration were estimated from NETN's long term forest health monitoring program (Tierney et al. 2017) and % Forest from the 2011 National Land Cover Database (Homer et al. 2015). See Doser et al. (2021) for further details.</p>
 </div>
 
-```{r concl, child="MORR_conlcusions.Rmd", echo=FALSE, message=FALSE, warning = FALSE, }
+```{r concl, child = "sections\\MORR_conclusions.Rmd", echo=FALSE, message=FALSE, warning = FALSE}
 
 ```
 
