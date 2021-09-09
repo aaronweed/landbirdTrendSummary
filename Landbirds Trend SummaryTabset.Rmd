@@ -55,7 +55,7 @@ PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>%
   filter(BCR %in% params$bcr)
 
 #import in Doser et al. 2020 trend estimates per species
-#The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years.It contains the estimated trend in species abundance after accounting for imperfect detection and effects of forest covariates. 
+#The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years. It contains the annual estimates of species abundance after accounting for imperfect detection and effects of forest covariates. 
 
 spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>% 
   pivot_longer(cols= 3:11, names_to = "park") %>% 
@@ -405,7 +405,7 @@ knitr::include_graphics("Fig3.jpg")
 Below are plots of relative abundance over time and associated trends (black line) when statistically significant (Doser et al. 2021) for the top 10 most abundant species detected since `r params$minYear` across `r params$Park`.
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
-```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=12, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA, fig.cap= "Figure 10. Relative abundance per year and associated trends over time (line) for the top 10 most abundant species detected across the park. Data exclude observations of species/individuals not suspected to be breeding in the forest (e.g., flyovers). During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit among all sites in a year. The estimate of the trend (log-scale with 95% C.I.) is denoted in the upper right of each panel. If the interval does <ins>not</ins> contain zero the trend is statistically significant over time and plotted for that species (e.g., Blue Jay). Rank order of abundance is denoted in parentheses following each species name." }
+```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=12, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA, cache=TRUE, fig.cap= "Figure 10. Relative abundance per year and associated trends over time (line) for the top 10 most abundant species detected across the park. Data exclude observations of species/individuals not suspected to be breeding in the forest (e.g., flyovers). During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit among all sites in a year. The estimate of the trend (log-scale with 95% C.I.) is denoted in the upper right of each panel. If the interval does <ins>not</ins> contain zero the trend is statistically significant over time and plotted for that species (e.g., Blue Jay). Rank order of abundance is denoted in parentheses following each species name." }
 
 #Get Top 10 species
 aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code
@@ -415,25 +415,25 @@ spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "c
     mutate(order= row_number())
 
 #subset sp_detects    
-plotdata<-
+NETNplotdata<-
    left_join(spp,sp_detects, by = "AOU_Code") %>% 
+    mutate(`Common Name` = common) %>% 
     mutate(common = paste0(common, " (", order,")")) %>% 
     mutate(common = fct_reorder(common, order)) %>% 
    left_join(.,spMeanYearEffect, by= c("AOU_Code","park")) %>% 
-    group_by(common)%>% 
-    mutate(trend_exp= round(exp(mean),2)*100) %>%  # calc 1-exp(trend) to determine % change every 4 years
+        mutate(trend_exp= round(exp(mean),2)*100) %>%  # calc 1-exp(trend) to determine % change every 4 years
     mutate(per_change = if_else(mean > 0,trend_exp-100, 100-trend_exp)) %>%  # add directional symbol of change
     mutate(per_change = if_else(mean >0,paste0(per_change,"%"), paste0("-",per_change,"%"))) %>%  # add directional symbol of change
-    dplyr::mutate(Nonsig= dplyr::between(0,lowCI, highCI)) %>% 
-    filter(AOU_Code %in% aou) 
+   group_by(common)%>%  
+   mutate(valueCenter = base::scale(value, center = TRUE)) %>% 
+    dplyr::mutate(Nonsig= ifelse(lowCI > 0 | highCI < 0, FALSE, TRUE)) %>% 
+    filter(AOU_Code %in% aou)
 
-#plotdata$Nonsig = ifelse(plotdata$lowCI > 0 | plotdata$highCI < 0, FALSE, TRUE)# determine in CI contains 0; returns TRUE
 
-
-GraphOut<-ggplot(data=plotdata, aes(x = Year, y = value, color = variable))+expand_limits(y=0)+
-      geom_point(data= dplyr::filter(plotdata, variable == "Field Observation"),size=2) + 
-      geom_line(data= dplyr::filter(plotdata, variable == "Field Observation"))+
-     #geom_line(data = filter(plotdata, Nonsig == FALSE & variable == "Trend Estimate")) +
+GraphOut<-ggplot(data=NETNplotdata, aes(x = Year, y = value, color = variable))+expand_limits(y=0)+
+      geom_point(data= dplyr::filter(NETNplotdata, variable == "Field Observation"),size=2) + 
+      geom_line(data= dplyr::filter(NETNplotdata, variable == "Field Observation"))+
+     #geom_line(data = filter(NETNplotdata, Nonsig == FALSE & variable == "Trend Estimate")) +
       #geom_errorbar(aes(ymin= mean-se, ymax= mean +se), width = .2, color = "#2171b5")+
       theme_classic()+
       theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
@@ -450,10 +450,11 @@ GraphOut<-ggplot(data=plotdata, aes(x = Year, y = value, color = variable))+expa
        theme(strip.background= element_rect(size=10, color="gray", linetype ="solid" ))+
       theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+
       facet_wrap(~common, ncol = 2, shrink= FALSE)+
-      geom_smooth(data= filter(plotdata, Nonsig == FALSE & variable == "Trend Estimate"), method = "lm", se= F)
-
+      geom_smooth(data= filter(NETNplotdata, Nonsig == FALSE & variable == "Trend Estimate"), method = "lm", se= F)
+      #geom_smooth(method = "loess")
+        
 GraphOut+
-  geom_text(data= dplyr::filter(plotdata, variable == "Trend Estimate")  %>% distinct(common, park, variable, mean, lowCI, highCI, per_change), show.legend = FALSE, aes(x = Inf, y = Inf, label=  paste(round(mean,3)," (",round(lowCI,2),",",round(highCI,2),")") , hjust = 1.05,vjust   = 1))
+  geom_text(data= dplyr::filter(NETNplotdata, variable == "Trend Estimate")  %>% distinct(common, park, variable, mean, lowCI, highCI, per_change), show.legend = FALSE, aes(x = Inf, y = Inf, label=  paste(round(mean,3)," (",round(lowCI,2),",",round(highCI,2),")") , hjust = 1.05,vjust   = 1))
 
 
 ```
@@ -472,10 +473,11 @@ NETN monitoring has indicated that Blue Jay, American Robin, Tufted Titmouse and
 ## derive fields from BBS trend data
 
 BBS_trends<- BBS_trends %>% 
-  mutate(Sig = ifelse(X2.5.CI > 0 | X97.5.CI < 0, "*", "n.s.")) %>% 
+  mutate(Sig = ifelse(X2.5.CI > 0 | X97.5.CI < 0, "**", "n.s.")) %>% 
   mutate(trend_dir = ifelse(Trend > 0,"Increase", "Decrease"))
             
-
+# arrow for decrease intToUtf8(8595)); arrow for increase intToUtf8(8593))
+      
 # Create trend data from NETN monitoring (rewritten from above)
 
 aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
@@ -490,7 +492,7 @@ NETNdata<-filter(spMeanYearEffect, AOU_Code %in% aou) %>%
   left_join(.,PIFSppByBCR, by= "AOU_Code") %>% # add PIF Designations
   mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
   mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
-  mutate(Sig = ifelse(lowCI > 0 | highCI < 0, "*", "n.s.")) %>% 
+  mutate(Sig = ifelse(lowCI > 0 | highCI < 0, "**", "n.s.")) %>% 
   mutate(common2 = fct_reorder(common2, mean)) %>% 
   mutate(trend_dir = ifelse(mean > 0, "Increase", "Decrease")) %>% 
   add_column(Region = paste0("MORR ", params$minYear, " - ", params$maxYear)) %>% 
@@ -512,23 +514,29 @@ BBSData<-  mutate(BBS_trends, common = stringr::str_squish(common)) %>% # remove
 TableData<- bind_rows(NETNdata, BBSData) %>%  
   mutate(Trend = paste0(trend_dir, " , ", Sig)) %>% dplyr::select(-Sig, -trend_dir) %>% 
   mutate(Trend = case_when(
-                  Trend == "Decrease , *"  ~ cell_spec(Trend, "html", color = "red", bold = T),
+                  Trend == "Decrease , **"  ~ cell_spec(Trend, "html", color = "red", bold = T),
                   Trend == "Decrease , n.s." ~ cell_spec(Trend, "html", color = "red", bold = F),
-                  Trend == "Increase , *"  ~ cell_spec(Trend, "html", color = "green", bold = T),
+                  Trend ==  "Increase , **"  ~ cell_spec(Trend, "html", color = "green", bold = T),
                   Trend == "Increase , n.s." ~ cell_spec(Trend, "html", color = "green", bold = F))) %>% 
   pivot_wider(names_from = "Region", values_from= Trend) %>% 
   left_join(.,PIFSppByBCR, by= c(`Common Name` = "Common_Name")) %>% # add PIF Designations
-  mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
+  mutate(PIF=  if_else(Regional.Importance == 1,"\\*","")) %>% 
   mutate(common2 = if_else(is.na(PIF), `Common Name`, paste(PIF,"",`Common Name`))) %>% 
   dplyr::select(Species= common2,`MORR 2006 - 2019`,`Appalachian Mountains 1966 - 2019`, `New Jersey 1966 - 2019`)
   
 
 
-kableExtra::kbl(TableData, escape = FALSE, align= "c", caption = paste0("Comparison of park trends to regional USGS Breeding Bird Survey data for the most commonly detected species at ", params$Park, ". * denotes a statistically significant increase or decrease in abundance; n.s. = non-significant. Asterisks next to a species name denote species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020)."))%>%
+kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Comparison of park trends to regional USGS Breeding Bird Survey data for the most commonly detected species at ", params$Park, ". An * next to a species name denotes species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020). ** denotes a statistically significant Increase or Decrease in bird abunce abundance over time; n.s. = non-significant."))%>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-```{r BBSplots, echo= FALSE, results = 'hide', fig.keep='all', cache= FALSE,  fig.height= 12, fig.width = 8, fig.align = 'center', message=FALSE, warning = FALSE, comment=NA, fig.cap= "Figure 11. Annual index reported by the NA BBS (sauer et al. 2020)"}
+
+```{r figcap2, echo=F, results = 'hide'}
+BBS_figcap <- paste0("Figure 11. BCR- and state-scale annual index reported by the North American BBS (Sauer et al. 2020) for the top 10 species detected at ", params$Park,".")
+```
+
+
+```{r BBSplots, echo= FALSE, results = 'hide', fig.keep='all', cache= FALSE,  fig.height= 12, fig.width = 8, fig.align = 'center', message=FALSE, warning = FALSE, comment=NA, fig.cap= BBS_figcap}
 
 BBS_tlu<- BBS_trends %>% distinct(AOU, common, Region, Region.Name) %>% 
  mutate(common = stringr::str_squish(common)) %>% # remove white space from common names for filtering
@@ -538,21 +546,37 @@ BBS_tlu<- BBS_trends %>% distinct(AOU, common, Region, Region.Name) %>%
   dplyr::filter(common %in% sp) %>%  # extract the species of interest
   dplyr::select(AOU, `Common Name` = common, Region, Region.Name)
 
-plotdata<-BBS_annual %>% 
+plotdata.bbs<-BBS_annual %>% 
   mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
  left_join( BBS_tlu,., by= c("AOU", "Region")) %>% 
-  mutate(Index= as.numeric(Index), lowCI = as.numeric(`X2.5.CI`), hiCI= as.numeric(`X97.5.CI`))
+  mutate(Index= as.numeric(Index), lowCI = as.numeric(`X2.5.CI`), hiCI= as.numeric(`X97.5.CI`)) %>% 
+  filter(., between(Year, params$minYear,params$maxYear)) %>% 
+  group_by(`Common Name`)%>%  
+   mutate(valueCenter = base::scale(Index, center = TRUE)) %>%
+ungroup()
 
-GraphOut<-ggplot(data=plotdata, aes(x = Year, y = Index, color = Region.Name))+expand_limits(y=0)+
-      geom_line(size = 1.5)+
-      #geom_ribbon(aes(ymin= Index - lowCI, ymax= Index + hiCI, color= Region), width = .2, color = "grey70")+
+# bring in NETNplotdata from section above
+
+plotdata.netn<-NETNplotdata %>% filter(variable == "Trend Estimate") %>% 
+  dplyr::select(`Common Name`, Year, valueCenter) %>% 
+  
+  add_column(Region.Name = params$Park) 
+  
+
+
+plotdata<- dplyr::select(plotdata.bbs,`Common Name`,Region.Name, Year, valueCenter) %>% 
+  bind_rows(plotdata.netn)
+
+GraphOut<-ggplot(data=plotdata, aes(x = Year, y = valueCenter, color = Region.Name, group = Region.Name))+expand_limits(y=0)+
+      geom_line(size = 1)+geom_point(size=1.5)+
+      #geom_ribbon(aes(ymin= lowCI, ymax= hiCI, group= Region.Name), width = .2)+
       theme_classic()+
       theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
       theme(axis.title.x =element_text(size = 14, face ="bold", vjust= 1))+
       theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
       theme(axis.text.x = element_text(color="black", size = 10))+
-      scale_x_continuous(breaks = seq(1966, 2019,10)) +
-      scale_color_manual(values = c("#2171b5", "black"))+
+      scale_x_continuous(breaks = seq(1966, 2019,2)) +
+      scale_color_manual(values = c("#2171b5", "darkgreen", "black" ))+
       labs(y="Annual BBS Idex" , color = "")+
       theme(legend.position = "top")+ 
       theme(legend.text = element_text(size = 12))+
