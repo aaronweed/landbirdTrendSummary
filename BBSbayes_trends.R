@@ -147,3 +147,7 @@ gf <- geofacet_plot(indices_list = indices,
 print(gf)
 
 
+
+
+
+
