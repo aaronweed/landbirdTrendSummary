@@ -542,73 +542,13 @@ TableData<- bind_rows(NETNdata, BBSData) %>%
   mutate(common2 = if_else(is.na(PIF), `Common Name`, paste(PIF,"",`Common Name`))) %>% 
   dplyr::select(Species= common2,3:5)
   
-kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Comparison of park trends to regional trends from the USGS Breeding Bird Survey (BBS; Sauer et al. 2020) for the most commonly detected species at ", params$Park, ". An * next to a species name denotes species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020). ** denotes a statistically significant Increase or Decrease in bird abunce abundance over time; n.s. = non-significant. Note that we were unable to access BBS trends for some species."))%>%
+kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Comparison of park trends to regional trends from the USGS Breeding Bird Survey (BBS; Sauer et al. 2020) for the most commonly detected species at ", params$Park, ". An * next to a species name denotes species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020). Trends: Increase or Decline denotes the average change in relative abundance over the time period. ** denotes a statistically significant Increase or Decrease in bird abundance over time whereas n.s.indicates a non-significant change in abundance over  time or a stable population."))%>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-Comparisons of NETN monitoring data to the results from the BBS suggest that trends in park-scale abundance are generally consistent with BBS results (for species we have estimates for) at the BCR-scale (7 of 9 species) and less so at the state-scale (3 of 9). The top 4 species encountered at `r params$Park` are in decline at the park and in the surrounding `r params$BCRName` BCR with the exception of Ovenbird, which has been stable but increasing in relative abundance across the `r params$BCRName` region since 2006. 
+Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that trends in park-scale abundance are generally consistent with trends at the `r params$BCRName` BCR-scale (8 of 10 species) and less so at the state-scale (4 of 10). The top 4 species encountered at `r params$Park` are in decline at the park and in the surrounding `r params$BCRName` BCR with the exception of Ovenbird, which has been stable and showing a slight increase in abundance across the `r params$BCRName` BCR and `r params$state` since 2006. 
 
-Observed declines of Wood Thrush, Scarlet Tanager, and Eastern Towhee -- species of regional conservation importance -- at `r params$Park` are concerning and also consistent with the broader patterns observed in the `r params$BCRName` BCR. However, besides Scarlet Tanager, which was estimated as declining significantly at `r params$Park` but only in decline at the state and BCR-scales, Eastern Towhee has not changed significantly within this time period at all scales evaluated. Additionally, while Wood Thrush is the most abundant species detected at the park but declining, it is significantly declining across the `r params$BCRName` BCR. Eastern Wood-Pewee is the only species of regional conservation importance showing stable and increasing population sizes at the park and within the broader region. Of the species we could estimate trends for, American Robin is the only one that has declined significantly since 2006 across park, state and BCR scales. 
-
-```{r figcap2, echo=F, results = 'hide'}
-BBS_figcap <- paste0("Figure 11. BCR- and state-scale annual index reported by the North American BBS (Sauer et al. 2020) for the top 10 species detected at ", params$Park,".")
-```
-
-
-```{r BBSplots, eval= FALSE, echo= FALSE, results = 'hide', fig.keep='all', cache= FALSE,  fig.height= 12, fig.width = 8, fig.align = 'center', message=FALSE, warning = FALSE, comment=NA, fig.cap= BBS_figcap}
-
-BBS_tlu<- BBS_trends %>% distinct(AOU_Code, common, Region, Region.Name) %>% 
- mutate(common = stringr::str_squish(common)) %>% # remove white space from common names for filtering
- mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
- mutate(Region.Name = stringr::str_squish(Region.Name)) %>% # remove white space from region names for presentation
-  dplyr::filter(Region == params$BBSRegion | Region == params$state) %>% # subset data   by BCR region of interest 
-  dplyr::filter(common %in% sp) %>%  # extract the species of interest
-  dplyr::select(AOU, `Common Name` = common, Region, Region.Name)
-
-plotdata.bbs<-BBS_annual %>% 
-  mutate(Region = stringr::str_squish(Region)) %>% # remove white space from region names for filtering
- left_join( BBS_tlu,., by= c("AOU", "Region")) %>% 
-  mutate(Index= as.numeric(Index), lowCI = as.numeric(`X2.5.CI`), hiCI= as.numeric(`X97.5.CI`)) %>% 
-  filter(., between(Year, params$minYear,params$maxYear)) %>% 
-  group_by(`Common Name`)%>%  
-   mutate(valueCenter = base::scale(Index, center = TRUE)) %>%
-ungroup()
-
-# bring in NETNplotdata from section above
-
-plotdata.netn<-NETNplotdata %>% filter(variable == "Trend Estimate") %>% 
-  dplyr::select(`Common Name`, Year, Index = value, valueCenter) %>% 
-  
-  add_column(Region.Name = params$Park) 
-  
-
-
-plotdata<- dplyr::select(plotdata.bbs,`Common Name`,Region.Name, Year, Index, valueCenter) %>% 
-  bind_rows(plotdata.netn)
-
-GraphOut<-ggplot(data=plotdata, aes(x = Year, y = Index, color = Region.Name, group = Region.Name))+expand_limits(y=0)+
-      geom_line(size = 1)+geom_point(size=1.5)+
-      #geom_ribbon(aes(ymin= lowCI, ymax= hiCI, group= Region.Name), width = .2)+
-      theme_classic()+
-      theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
-      theme(axis.title.x =element_text(size = 14, face ="bold", vjust= 1))+
-      theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
-      theme(axis.text.x = element_text(color="black", size = 10))+
-      scale_x_continuous(breaks = seq(1966, 2019,2)) +
-      scale_color_manual(values = c("#2171b5", "darkgreen", "black" ))+
-      labs(y="Annual BBS Idex" , color = "")+
-      theme(legend.position = "top")+ 
-      theme(legend.text = element_text(size = 12))+
-       theme(panel.background =  element_rect(fill="white", colour="black")) +
-       theme(plot.title=element_text(size=12, vjust=2, face= "bold")) +
-       theme(strip.background= element_rect(size=10, color="gray", linetype ="solid" ))+
-      theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+
-      facet_wrap(~`Common Name`, ncol = 2, shrink= FALSE, scales = "free_y")
-
-GraphOut
-```
-
-
+Observed declines of Wood Thrush, Scarlet Tanager, and Eastern Towhee -- species of regional conservation importance -- at `r params$Park` are concerning and also consistent with the broader patterns observed in the `r params$BCRName` BCR. However, besides Scarlet Tanager, which was estimated as declining significantly at `r params$Park`, Eastern Towhee has not changed significantly within this time period in all areas evaluated. Additionally, while Wood Thrush is the most abundant species detected at the park but in decline, it is significantly declining across the `r params$BCRName` BCR. Eastern Wood-Pewee is the only species of regional conservation importance with stable populations at the park and within the broader region. Finally, American Robin is the only species that has declined significantly since 2006 across park, state and BCR scales. 
 
 
 ### Conclusions
