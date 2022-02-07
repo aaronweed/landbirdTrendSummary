@@ -76,7 +76,8 @@ sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%
 
 #BBS_trends<-read.csv("./Data/BBS_1966-2019_core_trend_best.csv")%>% rename(common= Species.Name) # load in BBS trends estimates for 1966-2019 results
   
-BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx")
+BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx", 
+    sheet = "trend")
 
 ```
 <img src="NETN_Birdlogo_100.jpg" alt="landbird logo" style="height:100px;width:100.8px;float:right;padding:0;margin:10px -15px 0 0;">
@@ -89,7 +90,7 @@ BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx")
 NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear))
 ```
 <p class='capwrap'>
-Map of monitoring effort (# surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Clicking on the site displays the total number of surveys since `r params$minYear`. </p>
+Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Clicking on the site displays the unique site identifier and total number of surveys since `r params$minYear`. </p>
 </div>
 
 <h3> Long-term forest bird monitoring program </h3>
@@ -121,7 +122,7 @@ Map of monitoring effort (# surveys) at `r params$Park`'s permanent sites betwee
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1).  Species richness at `r params$Park` ranks as #7 among the 10 NETN parks monitored (Figure 2).</li>
+<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue).  Species richness at `r params$Park` ranks as #7 among the 10 NETN parks monitored (Figure 2).</li>
 <p>
 <li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). It is important to note that the number of <i>estimated</i> species as shown in Figure 1 (green) is typically higher than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). </li> 
 <p>
@@ -176,7 +177,7 @@ GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,Richness), y= Rich
 GraphOut
 ```
 
-```{r, richTrend, echo=F, fig.cap='Figure 3. Trends in estimated park-level species richness from 2006-2019. Points are the average species richness across all sites, gray regions denote the 95% credible intervals (measure of uncertainty). Inset text is the median (95% credible interval) linear trend estimating change per year in species richness (Doser et al. 2021). Note that observations at ELRO, HOFR, and VAMA were combined under ROVA for the analysis.', fig.align='left'}
+```{r, richTrend, echo=F, fig.cap='Figure 3. Trends in estimated park-level species richness from 2006-2019. Points are the average species richness across all sites, gray regions denote the 95% credible intervals (measure of uncertainty). Inset text is the median (95% credible interval) linear trend estimating change per year in species richness (Doser et al. 2021). Note that observations at ELRO, HOFR, and VAMA were combined under ROVA for the analysis and the model predicts species richness in years that were not sampled (e.g., SAGA: 2007).', fig.align='left'}
 knitr::include_graphics("Fig4.jpg")
 ```
 
