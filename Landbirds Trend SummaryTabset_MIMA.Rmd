@@ -45,6 +45,10 @@ ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
 PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% 
   filter(BCR %in% params$bcr)
 
+# exclude grassland sites from the queries by selecting the forest sites
+forest.sites<-getVisits(BirdData[ParkList == params$Park], site="Forest") %>% select(Point_Name) %>% distinct() %>% pull()
+
+
 #import in Doser et al. 2020 trend estimates per species
 #The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years. It contains the annual estimates of species abundance after accounting for imperfect detection and effects of forest covariates. 
 
@@ -64,7 +68,7 @@ pointCommunity <- read.csv("./Data/point-rich-bci-by-year.csv")
 ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
 
 # derive raw detects and add on modeled estimates
-sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
+sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T, points = forest.sites) %>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
 
@@ -87,10 +91,10 @@ BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx",
 ### Overview
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Effmap, echo = FALSE,  fig.height=5.75, fig.width= 5.75, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE,}
-NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear))
+NCRNbirds::mapEffort(BirdData[ParkList == params$Park], points = forest.sites, palette = "viridis", title = paste0("Total surveys since ",params$minYear))
 ```
 <p class='capwrap'>
-Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Clicking on the site displays the unique site identifier and total number of surveys since `r params$minYear`. </p>
+Map of monitoring effort (no. surveys) at `r params$Park`'s 23 permanent forest and 6 grassland sites between `r params$minYear` and `r params$maxYear`. Clicking on the site displays the unique site identifier and total number of surveys since `r params$minYear`. Grassland sites are located along the Battle Road Trail in the central and western part of the park. Data from those sites are not included in this report.</p>
 </div>
 
 <h3> Long-term forest bird monitoring program </h3>
@@ -105,6 +109,8 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
  <li> <b>Conclusions</b>: A summary of bird monitoring results in the context of park forest health. </li>
  <li> <b>Supporting Resources:</b> List of references and associated documentation for the bird monitoring program.</li> 
  </ul>
+
+Please note that bird monitoring at MIMA includes a combination of forested (23) and grassland (6) sites. The contents of this report primarily focus on data summaries from the forested sites unless otherwise denoted. However, given the proximity of the grassland sites (blue dots labeled as MIMA39## in the above map) to the forested sites there was a lot of overlap in species that were detected in both habitats. For instance, of the 76 species detected at MIMA only 9 were only detected at the grassland sites and 7 unque to the forested sites.
 
 <br>
 <h3>Methods</h3>
@@ -124,7 +130,7 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 <ul>
 <li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue).  Species richness at `r params$Park` ranks as #3 among the 10 NETN parks included in this report (Figure 2).</li>
 <p>
-<li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). It is important to note that in any given year the number of <i>estimated</i> species as shown in Figure 1 (green) is typically higher than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). The trend model (Figure 1, blue) estimated fewer species in 2017 and 2019 but overall the species diversity detected during monitoring is very similar from year to year. </li> 
+<li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). It is important to note that in any given year the number of <i>estimated</i> species as shown in Figure 1 (green) is typically higher than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). The trend model (Figure 1, green) estimated fewer species in 2017 and 2019 but overall the species diversity detected during monitoring is very similar from year to year and values fall within the confidence intervals (gray shading). </li> 
 <p>
 <li> While the number of forest bird species in `r params$Park` has not changed, it is one of 4 `r params$network` parks showing a slight (but non-significant) increase in estimated species richness over time (Figure 3). </li>
 </ul>
@@ -133,7 +139,7 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 ```{r richness, echo = TRUE, echo=FALSE, fig.height=4, fig.width= 10, fig.align = 'left', fig.cap= "Figure 1. Observed (blue) and estimated (green) species richness over time. Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers). The number of species estimated (green) is based on the study by Doser et al. (2021), which accounts for imperfect detection and the effect of forest structure. Note that this plot is not showing the total number of bird species in the park because our methods specifically focus on forest songbirds. Other bird species may be present in the park that are not detected during monitoring."}
 
 plotdata<- dplyr::filter(ParkCommAnnual, park == params$Park) %>% select(Year= year, `Estimated Richness` = median.rich, low = low.95.rich, hi = high.95.rich) %>% 
-  left_join(., NCRNbirds::birdRichness(BirdData[ParkList == params$Park], band= 1:2, byYear = TRUE), by = "Year") %>% dplyr::rename(`Observed Richness` = Richness) 
+  left_join(., NCRNbirds::birdRichness(BirdData[ParkList == params$Park], band= 1:2, byYear = TRUE, points = forest.sites), by = "Year") %>% dplyr::rename(`Observed Richness` = Richness) 
 
 colors<- c("Field Observation" = "#2171b5","Estimated (95% C.I.)"= "dark green")
  
@@ -155,9 +161,9 @@ ggplotly(GraphOut)
 ```
 </p>
 
-```{r, richPark, echo=F, fig.align = 'left',fig.cap= "Figure 2. Total number of species detected per park during surveys since monitoring began."}
+```{r, richPark, echo=F, fig.align = 'left',fig.cap= "Figure 2. Total number of species detected per park during all surveys since monitoring began including detections at grassland sites in MIMA and SARA."}
 
-# rank order for species richness among parks
+# rank order for species richness among parks (includes grassland sites)
 plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == params$Park,"yes","no")) %>% filter(Admin_Unit_Code != "SAIR")
 
 GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,Richness), y= Richness, fill= highlight))+geom_bar(stat = "identity", width=0.75)+
@@ -186,13 +192,13 @@ knitr::include_graphics("Fig4.jpg")
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r richmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE}
-mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2)
+mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2, points = forest.sites)
 ```
 <p class='capwrap'>
-Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. Click on the sites to see species richness observed per site.</p>
+Map of cumulative bird species richness detected at `r params$Park`'s permanent forest monitoring sites between `r params$minYear` and `r params$maxYear`. Click on the sites to see species richness observed per site.</p>
 </div>
 
-<p> While no formal analysis has been completed, this map shows that species richness is failry uniform acoross the park with . </p>
+<p> While no formal analysis has been completed, this map shows that cumulative species richness appears to be slightly lower at most of, but not all (e.g., Site 1302), sites along the southern boundary. </p>
 
 ### Bird Community Index {.tabset }
 
@@ -218,32 +224,32 @@ This average score is used to categorize the bird community of the park as eithe
 
 #### BCI Over Time
 
-Figure 4 shows that the BCI rating at `r params$Park` has remained relatively unchanged since `r params$minYear` and is of "High Integrity" compared to other bird communities within the Central Appalachian region. 
+Figure 4 shows that the BCI rating at `r params$Park` has remained relatively unchanged since `r params$minYear` and is of "Medium Integrity" compared to other bird communities within the Central Appalachian region. A score of Medium Integrity at `r params$Park` is not surprising given the surrounding land-use and forest health history and is due to the presence of generalist species, exotic species (e.g., European Starling, House Sparrow), brood parasites (e.g., Brown-headed Cowbird), and a relatively small diversity of interior forest obligates (but many are present). 
 
 <div style="float:right;position:relative;top:10px;padding:1px 1px 1px 1px;margin:0px 5px 10px 5px">
 ```{r BCI, echo=FALSE, fig.height=4, fig.width= 8, fig.align = 'left',fig.cap= "Figure 4. Annual Bird Community Index values averaged across the park forest. Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers). The annual BCI value shown is the average (+/-95% C.I.) BCI rating across all monitoring sites. The horizontal axis indicates the year, with the number of points monitored by visit in parenthesis.", message=FALSE}
-NCRNbirds::BCIPlot(BirdData[ParkList == params$Park], type= "Cent_Appal",  plot_title = "", band = 1:2, caption = FALSE)
+NCRNbirds::BCIPlot(BirdData[ParkList == params$Park], type= "Cent_Appal",  plot_title = "", band = 1:2, caption = FALSE, points = forest.sites)
 
 ```
 
 </div>
 
 #### BCI Across Monitoring Sites
-Bird Community Index ratings for permanent monitoring sites from `r params$minYear` to `r params$maxYear` are shown below across `r params$Park`. BCI scores are fairly uniform across the park and mainly of High Integrity (76% of sites). Seven of 29 (24%) monitoring sites were rated as Medium Integrity compared to other forests in the Central Appalachian region.  While most of these sites are located near the park boundary, they were not necessarily near a forest edge. Overall, this is excellent news and means that specialist forest birds have been breeding across the park.
+Bird Community Index ratings for permanent monitoring sites from `r params$minYear` to `r params$maxYear` are shown below across `r params$Park`. BCI scores are mostly rated as Medium Integrity across the park with a few sites rated as Low Integrity (5 of 23). 
 
 ```{r figcap, echo=F, results = 'hide'}
-map_figcap <- paste0("Map of Bird Community Index ratings for permanent monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers). Clicking on the site displays the unique site name and the BCI rating.")
+map_figcap <- paste0("Map of Bird Community Index ratings for permanent forest monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers). Clicking on the site displays the unique site name and the BCI rating.")
 ```
 
 ```{r BCIrichmap, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'left', message=FALSE, fig.cap = map_figcap}
 
-mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic")
+mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic",  points = forest.sites)
 ```
 
 
 #### BCI Compared to Other NETN Parks
 
-As of `r params$maxYear`, `r params$Park` has the 4th highest BCI rating in `r params$network` (Figure 5). The trend analysis concluded that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating (Doser et al. 2021) (Figure 6).   
+As of `r params$maxYear`, `r params$Park` has the lowest BCI rating in `r params$network` (Figure 5). An analysis concluded that trends in overall bird abundance seem to be declining the fastest in parks with the highest BCI rating (Doser et al. 2021) (Figure 6).   
 
 ```{r, BCIPark, echo=F, fig.height=4, fig.width= 8, fig.align = 'left', fig.cap= "Figure 5. Average BCI score per park since monitoring began", cache= TRUE}
 
@@ -299,10 +305,10 @@ Monitoring the status and trends of breeding birds in `r params$network` parks i
 
 <p> Bird Conservation Regions (BCRs) are ecologically distinct regions in North America with similar bird communities <a href="https://www.nabci-us.org/"> (www.nabci-us.org)</a>. `r params$Park` is located within the `r params$BCRName` BCR. Within this region, species of regional conservation importance have been designated based on rankings by Partners in Flight (Panjabi et al. 2020). 
 
-<strong> Seventeen songbird species of regional conservation concern within these BCRs have been detected at `r params$Park` </strong>, including Acadian Flycatcher, Black-and-white Warbler, Canada Warbler, Cerulean Warbler, Chipping Sparrow, Common Grackle, Eastern Towhee, Eastern Wood-Pewee, Hooded Warbler, Kentucky Warbler, Louisiana Waterthrush, Northern Flicker, Rose-breasted Grosbeak, Scarlet Tanager, Worm-eating Warbler, Wood Thrush, and Yellow-billed Cuckoo. Of these, 6 are among the 20 most abundant species detected (Figure 7)! </p>
+<strong> Fourteen species of regional conservation concern within the `r params$BCRName` BCR have been detected at `r params$Park` </strong>, including Barn Swallow, Black-and-white Warbler, Black-billed Cuckoo, Blue-winged Warbler, Canada Warbler, Chipping Sparrow, Chimney Swift, Common Grackle, Eastern Wood-Pewee, Northern Flicker, Rose-breasted Grosbeak, Scarlet Tanager, Wood Thrush, and Yellow-billed Cuckoo. Of these, 4 are among the 20 most abundant species detected (Figure 7)! </p>
 
 ```{r BCR birds, results='hide', echo= FALSE}
-# generate species detected in park against PIF checklist (does not print)
+# generate species detected in park that are on the PIF checklist (does not print)
 
 PIFSpecies<- getChecklist(BirdData[ParkList == params$Park], out.style = "AOU", band=1:2) %>% 
   as_tibble() %>% rename(AOU_Code = 1) %>% 
@@ -314,7 +320,7 @@ PIFSpecies<- getChecklist(BirdData[ParkList == params$Park], out.style = "AOU", 
 
 ```{r top20,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
 
-aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 20, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 20, band = 1:2, points = forest.sites)$AOU_Code # get Top 20 most abundant species (birds/point)
   
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)
@@ -351,7 +357,7 @@ Figure 7. Relative abundance of the 20 most commonly detected species at `r para
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r top10trend,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=4, fig.width= 6, fig.align = 'center', message=FALSE, warning = FALSE, comment=NA}
 
-aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2, points = forest.sites)$AOU_Code # get Top 20 most abundant species (birds/point)
   
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
@@ -391,23 +397,21 @@ BarChart
 ```
 
 <p class='capwrap'>
-Figure 8. Estimated trends in abundance between 2006 to 2019 of the top 10 most common species detected at `r params$Park` from Doser et al. (2021). The rank order of abundance in the park is denoted in parentheses following the species name. Trends estimates represent the average change in abundance on the <b> log scale</b> of a species per site every <b> four years</b>. Percentage values in the plot represent the associated average percent change in abundance every 4 years for trends that are statistically significant. For example, Blue Jay abundance has declined by about 20% every 4 years between `r params$minYear` to `r params$maxYear`. </p>
+Figure 8. Estimated trends in abundance between 2006 to 2019 of the top 10 most common species detected at `r params$Park` from Doser et al. (2021). The rank order of abundance in the park is denoted in parentheses following the species name. Trend estimates represent the average change in abundance on the <b> log scale</b> of a species per site every <b> four years</b>. Percentage values in the plot represent the associated average percent change in abundance every 4 years for trends that are statistically significant. For example, American Crow abundance has declined about 19% every 4 years between `r params$minYear` to `r params$maxYear`. </p>
 </div>
 
 ##### <b>Top 10 Most Abundant Species at `r params$Park` </b>
 
-<p> Figure 8 shows the trend estimates between `r params$minYear` and `r params$maxYear` for the top 10 most abundant species in `r params$Park` based on a model using time to first detection within the 10-minute point count (Doser et al. 2021). Average population size has not changed since `r params$minYear` for species when trend estimate error bars (credible intervals, C.I.) overlap zero (e.g. Eastern Wood-Pewee). Refer to Figure 10 in the Plots of Species Abundance section to see annual counts over time for these species. </p>
+<p> Figure 8 shows the trend estimates between `r params$minYear` and `r params$maxYear` for the top 10 most abundant species in `r params$Park` based on a model using time to first detection within the 10-minute point count (Doser et al. 2021). Average population size has not changed since `r params$minYear` for 9 of the most commonly detected species (e.g., trend estimate error bars overlap zero) but the detections of 8 of these species appear to be declining. American Crow is the only common species that has declined significantly while Red-winged Blackbird detections are increasing (but not significantly). Refer to Figure 10 in the "Plots of Species Abundance" section to see annual counts over time for the common species. </p>
 
-<p>None of the 10 most abundant songbirds detected in `r params$Park` have increased significantly over time since `r params$minYear`. Species of regional conservation importance (denoted by *), such as Eastern Wood-Peewee, was the only species estimated to have a slightly positive trend whereas Eastern Towhee and Wood Thrush appear to be in decline, but not significantly. The other 7 most common species have declined in abundance based on the monitoring data. However, of these Scarlet Tanager, American Robin, Blue Jay, and Tufted Titmouse have declined significantly during `r params$minYear` to `r params$maxYear`. </p>
+<p> Of the 4 commonly detected species at `r params$Park` that are of regional importance, the relative abundance of Scarlet Tanager, Wood Thrush and Common Grackle has remained the same since `r params$minYear` but over this time period we have observed significant increases in Eastern Wood-Pewee (not shown in Figure 8). This is encouraging news since most of these species are in decline regionally.</p>
 <p>
 
 ##### <b>Trends Across NETN Parks </b>
 
-<p> Trends in the abundance of all species combined across the network has not changed since 2006 (Figure 9A) but the trend varied widely across parks (Figure 9B). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
+<p> Trends in the abundance of all species combined across the network has not changed since 2006 (Figure 9a) but the trend varied widely across parks (Figure 9b). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
 
-<p> In parks with significant decreasing or increasing trends, most species generally showed a similar trend to the overall park trend, but often only a fraction of the species-specific trends were significantly different from zero. For example, while the trend analysis indicated that  46 species are in decline at `r params$Park`, only 9 have declined significantly since `r params$minYear` (Figure 9C). It is important to acknowledge declines in relative abundance even for species with trends that were non-significant in our study. This is because changes in the abundance of rare or less commonly detected species are usually less likely to show statistically significant trends in monitoring data yet are of conservation interest. Hence, lack of statistical significance does not mean that we shouldn't be concerned about species we are seeing fewer of over time -- our methods may not be sensitive enough to detect statistically significant changes.</p>
-
-<p> In `r params$Park`, the abundance of most species between `r params$minYear` to `r params$maxYear` appears to be in decline (Figure 9B and C). Nine species were estimated to have significantly declined in the park while Northern Flicker increased significantly during monitoring. The overwhelming majority of species showing a decline at `r params$Park` is concerning, but species-specific trends need further evaluation since for some species declines may occur due to natural forest succession (Holmes and Sherry 2001) whereas others may be negatively impacted by mortality during migration or human-caused stressors such as forest fragmentation and invasive species. Refer to the next section <i> Comparison to Regional Trends </i> to see how these species are trending at the state and BCR scale based on USGS Breeding Bird Survey data.</p>
+<p> In parks with significant decreasing or increasing trends, most species generally showed a similar trend to the overall park trend, but often only a fraction of the species-specific trends were significantly different from zero. For example, while the trend analysis indicated that  28 species are in decline at `r params$Park`, only 1 has declined significantly since `r params$minYear` (Figures 8 and 9c). It is important to acknowledge declines in relative abundance even for species with trends that were non-significant in our study. This is because changes in the abundance of rare or less commonly detected species are usually less likely to show statistically significant trends in monitoring data yet are of conservation interest. Hence, lack of statistical significance does not mean that we shouldn't be concerned about species we are seeing fewer of over time -- our methods may not be sensitive enough to detect statistically significant changes. On other hand, perhaps the most alarming result from the analysis is that birders have observed fewer of the most abundant species at `r params$Park` over time (see "Plots of Species Abundance"). </p>
 
 ```{r, NETNtrends,echo=F, fig.cap= "Figure 9. Trends in bird abundance across NETN from 2006-2019 estimated by Doser et al. (2021). Panel (a) shows the linear trend (log-scale) across the entire network with the 95% credible interval in parentheses. The trend estimates represent the average change  in abundance (log-scale) per site <strong>every four years</strong>. Error in the trend estimate is denoted in parentheses. Abundance is stable when the interval does not overlap zero. Panel (b) shows the park level trends. Red highlight indicates a significant negative year trend, white highlight indicates no significant trend, and blue highlight indicates a significant positive trend. Panel (c) shows the number of species with linear trend of year estimates that are negative (red) and positive (blue) within each park. The number of species with significant trends is shown in boldface in parentheses."}
 knitr::include_graphics("Fig3.jpg")
@@ -421,7 +425,7 @@ Below are plots of relative abundance over time and associated trends (black lin
 ```{r Top10TrendPlots,echo=FALSE,results='hide',fig.keep='all', fig.height=12, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA, cache=TRUE, fig.cap= "Figure 10. Relative abundance per year and associated trends over time (line) for the top 10 most abundant species detected across the park. Data exclude observations of species/individuals not suspected to be breeding in the forest (e.g., flyovers). During years when a site was surveyed more than once, the plotted average is calculated from the maximum count per survey visit among all sites in a year. The estimate of the trend (log-scale with 95% C.I.) is denoted in the upper right of each panel. If the interval does <ins>not</ins> contain zero the trend is statistically significant over time and plotted for that species (e.g., Blue Jay). Rank order of abundance is denoted in parentheses following each species name." }
 
 #Get Top 10 species
-aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2,points = forest.sites)$AOU_Code
 
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2) %>% 
@@ -487,7 +491,7 @@ BBS_trends<- BBS_trends %>%
       
 # Create trend data from NETN monitoring (rewritten from above)
 
-aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2)$AOU_Code # get Top 20 most abundant species (birds/point)
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2,points = forest.sites)$AOU_Code # get Top 20 most abundant species (birds/point)
   
 spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
     bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
@@ -547,10 +551,7 @@ kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Compari
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that trends in park-scale abundance are generally consistent with trends at the `r params$BCRName` BCR-scale (8 of 10 species) and less so at the state-scale (4 of 10). The top 4 species encountered at `r params$Park` are in decline at the park and in the surrounding `r params$BCRName` BCR with the exception of Ovenbird, which has been stable and showing a slight increase in abundance across the `r params$BCRName` BCR and `r params$state` since 2006. 
-
-Observed declines of Wood Thrush, Scarlet Tanager, and Eastern Towhee -- species of regional conservation importance -- at `r params$Park` are concerning and also consistent with the broader patterns observed in the `r params$BCRName` BCR. However, besides Scarlet Tanager, which was estimated as declining significantly at `r params$Park`, Eastern Towhee has not changed significantly within this time period in all areas evaluated. Additionally, while Wood Thrush is the most abundant species detected at the park but in decline, it is significantly declining across the `r params$BCRName` BCR. Eastern Wood-Pewee is the only species of regional conservation importance with stable populations at the park and within the broader region. Finally, American Robin is the only species that has declined significantly since 2006 across park, state and BCR scales. 
-
+Comparisons of NETN monitoring data for the top 10 most abundant species in `r params$Park` to the results available from the BBS suggest that trends in park-scale abundance are somewhat consistent with trends at the `r params$BCRName` BCR-scale and state-scale (4 of 8 species). BBS trends of these species at the `r params$BCRName` BCR and state-scale are identical with the exception of North Cardinal and White-breasted Nuthatch, which have increased significantly within the `r params$BCRName` BCR but not in Massachusetts. Declining trends in abundance, regardless of whether they are significant or not, of Blue Jay, American Robin, American Crow, and Black-capped Chickadee are consistent across `r params$Park` and BCR- and state-scales as is the non-significant increase in Gray Catbirds. Decreases observed in Northern Cardinal and White-breasted Nuthatch at the park but not at the other scales is notable but our monitoring data suggests that both species have stable breeding populations at the park. 
 
 ### Conclusions
 
@@ -581,7 +582,7 @@ knitr::include_graphics("Fig6.jpg")
 Figure 11. Relationship between average number of birds of a single species per site (y-axis) and (a) tree basal area, (b) percent forest within a 1km radius around each site, and (c) forest regeneration. Site-level basal area and regeneration were estimated from NETN's long term forest health monitoring program (Tierney et al. 2017) and % Forest from the 2011 National Land Cover Database (Homer et al. 2015). See Doser et al. (2021) for further details.</p>
 </div>
 
-```{r concl, child = "sections\\MORR_conclusions.Rmd", echo=FALSE, message=FALSE, warning = FALSE}
+```{r concl, child = "sections\\MIMA_conclusions.Rmd", echo=FALSE, message=FALSE, warning = FALSE}
 
 ```
 
