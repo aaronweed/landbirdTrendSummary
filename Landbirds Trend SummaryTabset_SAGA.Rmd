@@ -42,10 +42,13 @@ tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
 ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
 
+# import Partners in Flight designations per BCR
+
 PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% 
   filter(BCR %in% params$bcr)
 
 #import in Doser et al. 2020 trend estimates per species
+
 #The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years. It contains the annual estimates of species abundance after accounting for imperfect detection and effects of forest covariates. 
 
 spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>% 
@@ -53,17 +56,20 @@ spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>%
   add_column(variable = "Trend Estimate") %>% rename(Year = years, AOU_Code= species) %>% 
   dplyr::filter(park == params$Park)
 
+#The file "spMeanYearEffect.csv" contains the trend estimate for abundance for each species at each park. It contains the mean, lowCI and hiCI coefficient estimate for the year effect after accounting for imperfect detection and effects of forest covariates. 
+
 spMeanYearEffect <- read.csv("./Data/spMeanYearEffect.csv") %>% 
    pivot_longer(cols= 3:11, names_to = "park", values_to ="value") %>% 
   pivot_wider(id_cols=  c(park, species), names_from = "type", values_from= "value" ) %>% 
   rename(AOU_Code= species) %>% 
   dplyr::filter(park == params$Park)
 
-guildsMeanTrends <-read.csv("./Data/guildsMeanTrends.csv") # guild-level annual model estimates
-pointCommunity <- read.csv("./Data/point-rich-bci-by-year.csv")
+# Read in estimated richness values from Doser et al. 2021 
+
 ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
 
-# derive raw detects and add on modeled estimates
+# derive raw relative abundance from NETN monitoring to add on modeled estimates
+
 sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
@@ -72,10 +78,6 @@ sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%
 # load in USGS BBS recent survey and analysis results (https://www.sciencebase.gov/catalog/item/5f1836a482cef313ed843104)
 #Sauer, J.R., Link, W.A., and Hines, J.E., 2020, The North American Breeding Bird Survey, Analysis Results 1966 - 2019: U.S. Geological Survey data release, https://doi.org/10.5066/P96A7675.
 
-#BBS_annual<-read.csv("./Data/Index_Best_1966-2019_core.csv") # load in BBS annual index    1966-2019 results
-
-#BBS_trends<-read.csv("./Data/BBS_1966-2019_core_trend_best.csv")%>% rename(common= Species.Name) # load in BBS trends estimates for 1966-2019 results
-  
 BBS_trends <-read_excel("BBS trends/BBS_trends.xlsx", 
     sheet = "trend")
 
@@ -122,7 +124,7 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue).  Species richness at `r params$Park` ranks as #5 among the 10 NETN parks monitored (Figure 2).</li>
+<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the observed average species richness. Total pecies richness at `r params$Park` ranks as #5 among the 10 NETN parks monitored (Figure 2).</li>
 <p>
 <li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). It is important to note that the number of <i>estimated</i> species as shown in Figure 1 (green) is typically higher than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). This was only the case, however, in 2014 and 2019. At `r params$Park` the model actually estimated a lower annual species richness than what was observed because it also accounted for local forest structure (see Doser et al. 2021). The best explanation for why estimated species richness is <b>lower than</b> observed richness in most years is because the bird diversity at `r params$Park` is on average greater than in other network parks with similar forest structure as measured by the regeneration layer, forest cover, and live tree basal area. </li> 
 <p>
@@ -475,7 +477,7 @@ GraphOut+
 ```
 </div>
 
-#### Comparison to Regional Trends
+#### Regional Trends
 
 ```{r BBStable, echo= FALSE, results = 'asis', message=FALSE, warning = FALSE, cache = FALSE}
 
@@ -534,7 +536,7 @@ BBSData<-BBS_trends %>%
 TableData<- bind_rows(NETNdata, BBSData) %>%  
   mutate(Trend = paste0(trend_dir, " , ", Sig)) %>% dplyr::select(-Sig, -trend_dir) %>% 
   mutate(Trend = case_when(
-                  Trend == "NA , NA" ~ "No Estimate from BBS",
+                  Trend == "NA , NA" ~ "No Estimate",
                   Trend == "Decrease , **"  ~ cell_spec(Trend, "html", color = "red", bold = T),
                   Trend == "Decrease , n.s." ~ cell_spec(Trend, "html", color = "red", bold = F),
                   Trend ==  "Increase , **"  ~ cell_spec(Trend, "html", color = "green", bold = T),
@@ -552,6 +554,46 @@ kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Compari
 Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that trends in park-scale abundance are generally consistent with trends at the `r params$BCRName` BCR-scale (8 of 10 species) and less so at the state-scale (4 of 10). The top 4 species encountered at `r params$Park` are in decline at the park and in the surrounding `r params$BCRName` BCR with the exception of Ovenbird, which has been stable and showing a slight increase in abundance across the `r params$BCRName` BCR and `r params$state` since 2006. 
 
 Observed declines of Wood Thrush, Scarlet Tanager, and Eastern Towhee -- species of regional conservation importance -- at `r params$Park` are concerning and also consistent with the broader patterns observed in the `r params$BCRName` BCR. However, besides Scarlet Tanager, which was estimated as declining significantly at `r params$Park`, Eastern Towhee has not changed significantly within this time period in all areas evaluated. Additionally, while Wood Thrush is the most abundant species detected at the park but in decline, it is significantly declining across the `r params$BCRName` BCR. Eastern Wood-Pewee is the only species of regional conservation importance with stable populations at the park and within the broader region. Finally, American Robin is the only species that has declined significantly since 2006 across park, state and BCR scales. 
+
+#### All Species Trends 
+
+```{r trendests, echo= FALSE, results = 'asis', message=FALSE, warning = FALSE, cache = FALSE}
+
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 110, band = 1:2)$AOU_Code # get Top 10 most abundant species (birds/point)
+
+spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
+    mutate(order= row_number())
+
+
+spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>% 
+   left_join(spp,., by = "AOU_Code")%>% 
+  left_join(.,PIFSppByBCR, by= "AOU_Code") %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"\\*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
+  mutate(Nonsig = ifelse(lowCI > 0 | highCI < 0, FALSE, TRUE)) %>% 
+  mutate(common2 = fct_reorder(common2, mean)) %>% 
+  mutate(trend_exp= round(exp(mean),2)*100) %>%  # calc 1-exp(trend) to determine % change every 4 years
+  mutate(per_change = if_else(mean > 0,trend_exp-100, 100-trend_exp)) %>%  # add directional symbol of change
+  mutate(per_change = if_else(mean >0,paste0(per_change,"%"), paste0("-",per_change,"%"))) %>%  # add directional symbol of change
+  mutate(per_change = if_else(Nonsig == TRUE," ",per_change)) %>% 
+  mutate(mean = case_when(
+                  mean >0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "green", bold = T),
+                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T),
+                 !is.na(mean) ~ cell_spec(round(mean,3), "html",  bold = F))) %>%
+  mutate(common2 = case_when(
+                  mean > 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
+                  mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
+                  Nonsig == "TRUE" ~ cell_spec(common2, "html",  bold = F),
+                  is.na(Nonsig)~ cell_spec(common2, "html",  bold = F))) %>% 
+  select(`Abundance Rank` = order,`Common Name` = common2, lowCI, Estimate = mean, highCI, `Percent Change` = per_change)
+
+options(knitr.kable.NA = '')# remove NAs from table
+    
+kableExtra::kbl(spp.trend, digits = 3, escape = FALSE, align= "l", longtable= T, caption = paste0("Estimated trends in abundance between 2006 to 2019 for most of the species detected at ", params$Park," from Doser et al. (2021). Trend estimates represent the average change in abundance on the <b> log scale</b> of a species per site every <b> four years </b> and are statistically significant if the interval denoted between lowCI and highCI does not include zero. Positive Trend values indicate increases over time while negative values indicate decreases. The associated average percent change in abundance every 4 years is provided for trends that are statistically significant. See Doser et al. (2021) for further details describing why some species were excluded from the analysis. An * next to a species name denotes species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020).")) %>%
+  kable_styling(fixed_thead = TRUE, bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% add_header_above(c("", "", "Trend" = 4))
+
+```
 
 ### Conclusions
 

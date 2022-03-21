@@ -43,15 +43,14 @@ BirdData <- importNETNbirds("./Data/NETN") # needs to be fixed if multi-network
 tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
 ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
-stands<-readOGR(dsn = './Data/spatial',
-              layer = 'Forest_Managment_Plan_Stands_2004', 
-              verbose = TRUE)
-stands <- spTransform(stands, CRSobj = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
+# import Partners in Flight designations per BCR
 
 PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% 
   filter(BCR %in% params$bcr)
 
 #import in Doser et al. 2020 trend estimates per species
+
 #The file "spMeanTrends.csv" contains the data used to generate the trends in abundance for each species across the study years. It contains the annual estimates of species abundance after accounting for imperfect detection and effects of forest covariates. 
 
 spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>% 
@@ -59,17 +58,20 @@ spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>%
   add_column(variable = "Trend Estimate") %>% rename(Year = years, AOU_Code= species) %>% 
   dplyr::filter(park == params$Park)
 
+#The file "spMeanYearEffect.csv" contains the trend estimate for abundance for each species at each park. It contains the mean, lowCI and hiCI coefficient estimate for the year effect after accounting for imperfect detection and effects of forest covariates. 
+
 spMeanYearEffect <- read.csv("./Data/spMeanYearEffect.csv") %>% 
    pivot_longer(cols= 3:11, names_to = "park", values_to ="value") %>% 
   pivot_wider(id_cols=  c(park, species), names_from = "type", values_from= "value" ) %>% 
   rename(AOU_Code= species) %>% 
   dplyr::filter(park == params$Park)
 
-guildsMeanTrends <-read.csv("./Data/guildsMeanTrends.csv") # guild-level annual model estimates
-pointCommunity <- read.csv("./Data/point-rich-bci-by-year.csv")
+# Read in estimated richness values from Doser et al. 2021 
+
 ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
 
-# derive raw detects and add on modeled estimates
+# derive raw relative abundance from NETN monitoring to add on modeled estimates
+
 sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
   add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
@@ -78,13 +80,15 @@ sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%
 # load in USGS BBS recent survey and analysis results (https://www.sciencebase.gov/catalog/item/5f1836a482cef313ed843104)
 #Sauer, J.R., Link, W.A., and Hines, J.E., 2020, The North American Breeding Bird Survey, Analysis Results 1966 - 2019: U.S. Geological Survey data release, https://doi.org/10.5066/P96A7675.
 
-#BBS_annual<-read.csv("./Data/Index_Best_1966-2019_core.csv") # load in BBS annual index    1966-2019 results
-
-#BBS_trends<-read.csv("./Data/BBS_1966-2019_core_trend_best.csv")%>% rename(common= Species.Name) # load in BBS trends estimates for 1966-2019 results
-  
-BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx", 
+BBS_trends <-read_excel("BBS trends/BBS_trends.xlsx", 
     sheet = "trend")
 
+# load in MABI forest stands layer
+
+stands<-readOGR(dsn = './Data/spatial',
+              layer = 'Forest_Managment_Plan_Stands_2004', 
+              verbose = TRUE)
+stands <- spTransform(stands, CRSobj = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
 ```
 <img src="NETN_Birdlogo_100.jpg" alt="landbird logo" style="height:100px;width:100.8px;float:right;padding:0;margin:10px -15px 0 0;">
 
@@ -93,10 +97,11 @@ BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx",
 ### Overview
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Effmap, echo = FALSE,  fig.height=5.75, fig.width= 5.75, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE,}
-NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear)) %>% addPolylines(data= stands, weight=1)
+NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear)) %>% addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
+  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
 ```
 <p class='capwrap'>
-Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Clicking on the site displays the unique site identifier and total number of surveys since `r params$minYear`. Blue lines denote forest management stands.</p>
+Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and total number of surveys since `r params$minYear`. .</p>
 </div>
 
 <h3> Long-term forest bird monitoring program </h3>
@@ -128,7 +133,7 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue).  Note that at least two species, and possibly others detected, may not be breeding in the park  (e.g., Spotted Sandpiper) or are breeding in non-forested areas surrounding our sites (e.g., Bobolink). Species richness at `r params$Park` ranks as #4 among the NETN parks monitored (Figure 2).</li>
+<li>  At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the average species richness. Some of the species detected are breeding in non-forested areas surrounding our sites (e.g., Bobolink). Species richness at `r params$Park` ranks as #4 among the NETN parks monitored (Figure 2).</li>
 <p>
 <li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3) but there is a suggestion of a decline. It is important to note that the number of <i>estimated</i> species as shown in Figure 1 (green) may be higher in some years than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). The model describing species richness over time at `r params$Park` seems adequate because most of the monitoring data is contained within the confidence intervals (gray area around) surrounding the trend.</li> 
 <p>
@@ -192,10 +197,11 @@ knitr::include_graphics("Fig4.jpg")
 
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r richmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE}
-mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2)%>% addPolylines(data= stands, weight=1)
+mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2) %>%  addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
+  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
 ```
 <p class='capwrap'>
-Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. Click on the sites to see species richness observed per site. Blue lines denote forest management stands.</p>
+Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and total observed species since `r params$minYear`. .</p>
 </div>
 
 <p> While no formal analysis has been completed, this map shows that the cumulative species diversity is fairly uniform across the majoirty of the 25 sites at the park. A higher diversity has been observed at one site located right next to the Pogue and along our MABI South route. </p>
@@ -238,12 +244,13 @@ NCRNbirds::BCIPlot(BirdData[ParkList == params$Park], type= "Cent_Appal",  plot_
 Bird Community Index ratings for permanent monitoring sites from `r params$minYear` to `r params$maxYear` are shown below across `r params$Park`. BCI scores are fairly uniform across the park sites and mainly rated as High Integrity (68% of sites). This indicates that multiple forest specialist species (residents and migratory) are breeding across most of the park's forest. 
 
 ```{r figcap, echo=F, results = 'hide'}
-map_figcap <- paste0("Map of Bird Community Index ratings for permanent monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers). Clicking on the site displays the unique site name and the BCI rating. Blue lines denote forest management stands.")
+map_figcap <- paste0("Map of Bird Community Index ratings for permanent monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers, grassland breeders). Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and BCI rating.")
 ```
 
 ```{r BCIrichmap, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'left', message=FALSE, fig.cap = map_figcap}
 
-mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic")%>% addPolylines(data= stands, weight=1)
+mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic") %>% addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
+  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
 ```
 
 
@@ -554,6 +561,46 @@ kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Compari
 ```
 
 Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that species' trends in park abundance are generally consistent with trends at the `r params$BCRName` BCR- and state-scales but with a few important exceptions. Of particular importance is the discrepancy in trends of Ovenbird and Red-eyed Vireo, which are declining at the park but appear to be increasing or have stable populations at the state and BCR scales according to BBS. Both of these species are also increasing over a similar time period at monitoring sites across Vermont within the Forest Bird Monitoring Program (Faccio et al. 2017) and at Saint Gaudens NHP in Cornish, NH, which is approximately 20 miles east of MABI. Most of the other abundant species breeding at `r params$Park` are also in decline at the park-, state-, and BCR-scales and with trends of these species recorded from Vermont's Forest Bird Monitoring Program (Faccio et al. 2017), but not all. Overall, this consistency in trends across spatial scales suggests that factors affecting the status of these species are likely occurring at scales beyond the park (e.g., survival during migration, forest maturation, climate change, etc). However, the consistent decline observed since `r params$minYear` of many species at MABI and the discrepancy in trends of Ovenbird and Red-eyed Vireo to the broader region, warrants further investigation into whether park-specific factors may be important. 
+
+#### All Species Trends 
+
+```{r trendests, echo= FALSE, results = 'asis', message=FALSE, warning = FALSE, cache = FALSE}
+
+aou<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 110, band = 1:2)$AOU_Code # get Top 10 most abundant species (birds/point)
+
+spp<-getBirdNames(BirdData[ParkList == params$Park], names= aou , out.style = "common") %>% 
+    bind_cols(.,aou ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)%>% 
+    mutate(order= row_number())
+
+
+spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>% 
+   left_join(spp,., by = "AOU_Code")%>% 
+  left_join(.,PIFSppByBCR, by= "AOU_Code") %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"\\*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
+  mutate(Nonsig = ifelse(lowCI > 0 | highCI < 0, FALSE, TRUE)) %>% 
+  mutate(common2 = fct_reorder(common2, mean)) %>% 
+  mutate(trend_exp= round(exp(mean),2)*100) %>%  # calc 1-exp(trend) to determine % change every 4 years
+  mutate(per_change = if_else(mean > 0,trend_exp-100, 100-trend_exp)) %>%  # add directional symbol of change
+  mutate(per_change = if_else(mean >0,paste0(per_change,"%"), paste0("-",per_change,"%"))) %>%  # add directional symbol of change
+  mutate(per_change = if_else(Nonsig == TRUE," ",per_change)) %>% 
+  mutate(mean = case_when(
+                  mean >0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "green", bold = T),
+                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T),
+                  !is.na(mean) ~ cell_spec(round(mean,3), "html",  bold = F, color="black"))) %>%
+  mutate(common2 = case_when( is.na(Nonsig)~ cell_spec(common2, "html",  bold = F),
+                  mean > 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
+                  mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
+                  Nonsig == "TRUE" ~ cell_spec(common2, "html",  bold = F),
+                  )) %>% 
+  select(`Abundance Rank` = order,`Common Name` = common2, lowCI, Estimate = mean, highCI, `Percent Change` = per_change)
+
+options(knitr.kable.NA = '')
+    
+kableExtra::kbl(spp.trend, digits = 3, escape = FALSE, align= "l", longtable= T, caption = paste0("Estimated trends in abundance between 2006 to 2019 for most of the species detected at ", params$Park," from Doser et al. (2021). Trend estimates represent the average change in abundance on the <b> log scale</b> of a species per site every <b> four years </b> and are statistically significant if the interval denoted between lowCI and highCI does not include zero. Positive Trend values indicate increases over time while negative values indicate decreases. The associated average percent change in abundance every 4 years is provided for trends that are statistically significant. See Doser et al. (2021) for further details describing why some species were excluded from the analysis. An * next to a species name denotes species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020).")) %>%
+  kable_styling(fixed_thead = TRUE, bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>% add_header_above(c("", "", "Trend" = 4))
+
+```
 
 
 ### Conclusions

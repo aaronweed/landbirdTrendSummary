@@ -64,7 +64,7 @@ spMeanTrends <- read.csv("./Data/spMeanTrends.csv") %>%
   add_column(variable = "Trend Estimate") %>% rename(Year = years, AOU_Code= species) %>% 
   dplyr::filter(park == params$Park)
 
-#The file "spMeanYearEffect.csv" contains the trend estimate for abundance for each species at each park. It contains the mean, lowCI and hiCI coefiiciatn estimate for the year effect after accounting for imperfect detection and effects of forest covariates. 
+#The file "spMeanYearEffect.csv" contains the trend estimate for abundance for each species at each park. It contains the mean, lowCI and hiCI coefficient estimate for the year effect after accounting for imperfect detection and effects of forest covariates. 
 
 spMeanYearEffect <- read.csv("./Data/spMeanYearEffect.csv") %>% 
    pivot_longer(cols= 3:11, names_to = "park", values_to ="value") %>% 
@@ -201,7 +201,7 @@ Bird monitoring at `r params$Park` includes a combination of sites located in ar
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year <b> across forested and grassland sites </b> (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the observed average species richness. Species richness at our `r params$Park` sites ranks as #1 among the 10 NETN parks included in the analysis (Figure 2) but it is important to note that we monitor grassland/open field habitats at MIMA and SARA in addition to our forested sites where in most parks we only monitor forests. </li>
+<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year <b> across forested and grassland sites </b> (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the observed average species richness. Total species richness at our `r params$Park` sites ranks as #1 among the 10 NETN parks included in the analysis (Figure 2) but it is important to note that we monitor grassland/open field habitats at MIMA and SARA in addition to our forested sites where in most parks we only monitor forests. </li>
 <p>
 <li> Although slightly increasing over time, the average number of species detected at our sites has remained <b> unchanged </b> (statistically speaking) between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). The trend model (Figure 1, green) estimated fewer species in a couple of years but overall the species diversity detected during monitoring is very similar from year to year and most field observations fall within the confidence intervals (gray shading). </li> 
 <p>
@@ -651,12 +651,13 @@ spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>%
   mutate(per_change = if_else(Nonsig == TRUE," ",per_change)) %>% 
   mutate(mean = case_when(
                   mean >0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "green", bold = T),
-                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T))) %>%
-  mutate(common2 = case_when(
+                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T),
+                  !is.na(mean) ~ cell_spec(round(mean,3), "html",  bold = F, color="black"))) %>%
+  mutate(common2 = case_when( is.na(Nonsig)~ cell_spec(common2, "html",  bold = F),
                   mean > 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
                   mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
                   Nonsig == "TRUE" ~ cell_spec(common2, "html",  bold = F),
-                  is.na(Nonsig)~ cell_spec(common2, "html",  bold = F))) %>% 
+                  )) %>% 
   select(`Abundance Rank` = order,`Common Name` = common2, lowCI, Estimate = mean, highCI, `Percent Change` = per_change)
 
 options(knitr.kable.NA = '')

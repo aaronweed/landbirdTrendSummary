@@ -46,7 +46,9 @@ tlu_GuildRatings <- read_excel("./Data/tlu_GuildRatings.xlsx")
 guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
 ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
 
-PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% # import Partners in Flight designations per BCR
+# import Partners in Flight designations per BCR
+
+PIFSppByBCR<- read.csv("./Data/PIF_Species_BCR.csv") %>% 
   filter(BCR %in% params$bcr)
 
 # create vector of forested points for queries excluding grassland sites 
@@ -83,7 +85,6 @@ sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T) 
 # load in USGS BBS recent survey and analysis results (https://www.sciencebase.gov/catalog/item/5f1836a482cef313ed843104)
 
 #Sauer, J.R., Link, W.A., and Hines, J.E., 2020, The North American Breeding Bird Survey, Analysis Results 1966 - 2019: U.S. Geological Survey data release, https://doi.org/10.5066/P96A7675.
-
 
 BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx", 
     sheet = "trend")
@@ -600,7 +601,7 @@ BBSData<-BBS_trends %>%
 TableData<- bind_rows(NETNdata, BBSData) %>%  
   mutate(Trend = paste0(trend_dir, " , ", Sig)) %>% dplyr::select(-Sig, -trend_dir) %>% 
   mutate(Trend = case_when(
-                  Trend == "NA , NA" ~ "No Estimate from BBS",
+                  Trend == "NA , NA" ~ "No Estimate",
                   Trend == "Decrease , **"  ~ cell_spec(Trend, "html", color = "red", bold = T),
                   Trend == "Decrease , n.s." ~ cell_spec(Trend, "html", color = "red", bold = F),
                   Trend ==  "Increase , **"  ~ cell_spec(Trend, "html", color = "green", bold = T),
@@ -641,7 +642,8 @@ spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>%
   mutate(per_change = if_else(Nonsig == TRUE," ",per_change)) %>% 
   mutate(mean = case_when(
                   mean >0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "green", bold = T),
-                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T))) %>%
+                  mean <0 & Nonsig == "FALSE" ~ cell_spec(round(mean,3), "html", color = "red", bold = T),
+                  !is.na(mean) ~ cell_spec(round(mean,3), "html",  bold = F))) %>%
   mutate(common2 = case_when(
                   mean > 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
                   mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
