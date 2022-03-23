@@ -35,6 +35,7 @@ library(kableExtra)
 library(formattable)
 library(RColorBrewer)
 library(sp)
+library(sf)
 library(rgdal)
 
 # load in network monitoring data and look-up tables
@@ -86,9 +87,31 @@ BBS_trends <-read_excel("BBS trends/BBS_trends.xlsx",
 # load in MABI forest stands layer
 
 stands<-readOGR(dsn = './Data/spatial',
-              layer = 'Forest_Managment_Plan_Stands_2004', 
-              verbose = TRUE)
-stands <- spTransform(stands, CRSobj = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+             layer = 'Forest_Managment_Plan_Stands_2004', 
+            verbose = FALSE)
+
+stands <- spTransform(stands, CRSobj = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs') %>% st_as_sf()
+
+# Create 2 fields in the veg attribute table: simp_stands, and fills
+unique(stands$TYPE)
+
+open<-c('Hay Field', 'Open Field', 'Upland Pasture')
+
+stands.simp <- stands %>% 
+  dplyr::mutate(simp_stands = case_when(TYPE %in% open ~ 'Open Field',
+                              TYPE %in% "Gardens & Grounds" ~ 'Developed',
+                              TRUE ~ as.character(TYPE)),
+         fill_col = case_when(simp_stands == 'Developed' ~ '#D8D8D8',
+                              simp_stands == 'Open Field' ~ '#f5f0b0',
+                              simp_stands == 'Natural Stand' ~ '#55785e',
+                              simp_stands == 'Plantation' ~ '#e59f37',
+                              simp_stands == 'Open Water' ~ '#AFD0F2'))
+
+stands2 <- filter(stands.simp, simp_stands %in% "Natural Stand" | simp_stands %in% "Open Field"| simp_stands %in% "Plantation") %>% select(geometry, simp_stands, fill_col)
+
+mapCols<-colorFactor(c("#55785e","#f5f0b0","#e59f37"), domain = stands2$simp_stands)# set map colors for habitat types
+
+
 ```
 <img src="NETN_Birdlogo_100.jpg" alt="landbird logo" style="height:100px;width:100.8px;float:right;padding:0;margin:10px -15px 0 0;">
 
@@ -97,11 +120,12 @@ stands <- spTransform(stands, CRSobj = '+proj=longlat +ellps=WGS84 +datum=WGS84 
 ### Overview
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Effmap, echo = FALSE,  fig.height=5.75, fig.width= 5.75, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE,}
-NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear)) %>% addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
-  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
+NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear)) %>% addPolylines(data= stands2, weight=1) %>% addPolygons(data= stands2, opacity= 0.5 , fillColor = ~fill_col, fillOpacity =0.5, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Cover Type") %>% addLegend(data= stands2, "bottomright", pal = mapCols, values = ~simp_stands,
+    title = "Cover Type",opacity = .5) %>% hideGroup("Cover Type") %>% 
+  addLayersControl(overlayGroups = "Cover Type", options = layersControlOptions(collapsed = FALSE))
 ```
 <p class='capwrap'>
-Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and total number of surveys since `r params$minYear`. .</p>
+Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands (MABI 2006). Hovering over the map when the Cover Type layer is selected will display the stand ID number. When the Cover Type layer is not selected you can click on the site to display its unique site identifier and total number of surveys since `r params$minYear`.</p>
 </div>
 
 <h3> Long-term forest bird monitoring program </h3>
@@ -133,9 +157,9 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li>  At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the average species richness. Some of the species detected are breeding in non-forested areas surrounding our sites (e.g., Bobolink). Species richness at `r params$Park` ranks as #4 among the NETN parks monitored (Figure 2).</li>
+<li>  At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the average species richness. And, some of the species detected are breeding in non-forested areas surrounding our sites (e.g., Bobolink). Total species richness at `r params$Park` ranks as #4 among the NETN parks monitored (Figure 2) but it is important to note that we also monitor grassland/open field habitats at MIMA and SARA in addition to forested sites where at `r params$Park` we only monitor forests.</li>
 <p>
-<li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3) but there is a suggestion of a decline. It is important to note that the number of <i>estimated</i> species as shown in Figure 1 (green) may be higher in some years than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). The model describing species richness over time at `r params$Park` seems adequate because most of the monitoring data is contained within the confidence intervals (gray area around) surrounding the trend.</li> 
+<li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3) but there is a suggestion of a decline. The trend model (Figure 1, green) estimated either more or less species in a couple of years but overall the species diversity detected during monitoring is very similar from year to year and most field observations fall within the confidence intervals (gray shading).</li> 
 <p>
 <li> While the number of forest bird species in `r params$Park` has not changed, it is one of 4 `r params$network` parks showing a slight (but non-significant) decline over time (Figure 3). </li>
 </ul>
@@ -195,16 +219,18 @@ knitr::include_graphics("Fig4.jpg")
 
 #### No. of Species Across Monitoring Sites
 
-<div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
-```{r richmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE}
-mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2) %>%  addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
-  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
-```
-<p class='capwrap'>
-Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and total observed species since `r params$minYear`. .</p>
-</div>
+<p> While no formal analysis has been completed, this map shows that the cumulative species diversity is fairly uniform across the majority of the 25 sites at the park. A higher diversity has been observed at one site located right next to the Pogue and along our MABI South route. </p>
 
-<p> While no formal analysis has been completed, this map shows that the cumulative species diversity is fairly uniform across the majoirty of the 25 sites at the park. A higher diversity has been observed at one site located right next to the Pogue and along our MABI South route. </p>
+<p> (If for some reason the map is not loading correctly, please right-click on the map and select "Reload") </p>
+
+```{r richmap, echo = FALSE,  fig.height=6, fig.width= 10, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE}
+mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2) %>% addPolylines(data= stands2, weight=1) %>% addPolygons(data= stands2, opacity= 0.5 , fillColor = ~fill_col, fillOpacity =0.5, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Cover Type") %>% addLegend(data= stands2, "bottomright", pal = mapCols, values = ~simp_stands,
+    title = "Cover Type",opacity = .5) %>% hideGroup("Cover Type") %>% 
+  addLayersControl(overlayGroups = "Cover Type", options = layersControlOptions(collapsed = FALSE))
+```
+
+Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. Blue lines denote forest management stands (MABI 2006). Hovering over the map when the  Cover Type layer is selected will display the stand ID number. When the  Cover Type layer is not selected you can click on the site to display its unique site identifier and total observed species since `r params$minYear`.</p>
+
 
 ### Bird Community Index {.tabset }
 
@@ -244,19 +270,20 @@ NCRNbirds::BCIPlot(BirdData[ParkList == params$Park], type= "Cent_Appal",  plot_
 Bird Community Index ratings for permanent monitoring sites from `r params$minYear` to `r params$maxYear` are shown below across `r params$Park`. BCI scores are fairly uniform across the park sites and mainly rated as High Integrity (68% of sites). This indicates that multiple forest specialist species (residents and migratory) are breeding across most of the park's forest. 
 
 ```{r figcap, echo=F, results = 'hide'}
-map_figcap <- paste0("Map of Bird Community Index ratings for permanent monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers, grassland breeders). Blue lines denote forest management stands. Hovering over the map when the stands layer is selected will display the stand ID number. When the stands layer is not selected you can click on the site to display its unique site identifier and BCI rating.")
+map_figcap <- paste0("Map of Bird Community Index ratings for permanent monitoring sites in ", params$Park, " from ",  params$minYear, " to ", params$maxYear, ". Data summaries exclude species not suspected to be breeding in the forest (e.g., flyovers, grassland breeders). Blue lines denote forest management stands (MABI 2006). Hovering over the map when the Cover Type layer is selected will display the stand ID number. When the Cover Type layer is not selected you can click on the site to display its unique site identifier and BCI rating.")
 ```
 
 ```{r BCIrichmap, echo = TRUE, echo=FALSE, fig.height=6, fig.width= 10, fig.align = 'left', message=FALSE, fig.cap = map_figcap}
 
-mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic") %>% addPolylines(data= stands, weight=1) %>% addPolygons(data= stands, opacity= 0.5 , fillOpacity =0, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Stands") %>% 
-  addLayersControl(overlayGroups = "Stands", options = layersControlOptions(collapsed = FALSE))
+mapBCI(BirdData[ParkList == params$Park], band =2, type= "Cent_Appal", years = params$minYear:params$maxYear, maptype = "basic", palette = "viridis") %>% addPolylines(data= stands2, weight=1) %>% addPolygons(data= stands2, opacity= 0.5 , fillColor = ~fill_col, fillOpacity =0.5, fill= TRUE,label= stands$STAND_ID, weight=1, color="blue", group= "Cover Type") %>% addLegend(data= stands2, "bottomright", pal = mapCols, values = ~simp_stands,
+    title = "Cover Type",opacity = .5) %>% hideGroup("Cover Type") %>% 
+  addLayersControl(overlayGroups = "Cover Type", options = layersControlOptions(collapsed = FALSE))
 ```
 
 
 #### BCI Compared to Other NETN Parks
 
-As of `r params$maxYear`, `r params$Park` has the 2nd highest BCI rating in `r params$network` (Figure 5)! Our recent analysis concluded that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating (Doser et al. 2021) (Figure 6). We are still examining why this may be so, but this pattern is likely to be related more to regional factors rather than factors operating at the park-scale.
+As of `r params$maxYear`, `r params$Park` has the 2nd highest BCI rating in `r params$network` (Figure 5)! Our recent analysis concluded that trends in overall bird abundance are declining the fastest in parks with the highest BCI rating (Doser et al. 2021) (Figure 6). We are still examining why this is occuring and at `r params$Park`.
 
 ```{r, BCIPark, echo=F, fig.height=4, fig.width= 8, fig.align = 'left', fig.cap= "Figure 5. Average BCI score per park since monitoring began", cache= TRUE}
 
@@ -312,7 +339,7 @@ Monitoring the status and trends of breeding birds in `r params$network` parks i
 
 <p> Bird Conservation Regions (BCRs) are ecologically distinct regions in North America with similar bird communities <a href="https://www.nabci-us.org/"> (www.nabci-us.org)</a>. `r params$Park` is located within the `r params$BCRName` BCR. Within this region, species of regional conservation importance have been designated based on rankings by Partners in Flight (Panjabi et al. 2020). 
 
-<strong> Sixteen species of regional conservation concern within the `r params$BCRName` BCR have been detected at `r params$Park` </strong>, including Black-and-white Warbler, Belted Kingfisher, Bobolink, Black-throated Blue Warbler, Chimney Swift, Eastern Wood-Pewee, Least Flycather, Mourning Warbler, Nashville Warbler, Northern Flicker, Northern Parula, Purple Finch, Rose-breasted Grosbeak, Scarlet Tanager, Veery, and Wood Thrush. Of these, 5 are among the 20 most abundant species detected (Figure 7)! </p>
+<strong> Sixteen species of regional conservation concern within the `r params$BCRName` BCR have been detected at `r params$Park` </strong>, including Black-and-white Warbler, Belted Kingfisher, Bobolink, Black-throated Blue Warbler, Chimney Swift, Eastern Wood-Pewee, Least Flycatcher, Mourning Warbler, Nashville Warbler, Northern Flicker, Northern Parula, Purple Finch, Rose-breasted Grosbeak, Scarlet Tanager, Veery, and Wood Thrush. Of these, 5 are among the 20 most abundant species detected (Figure 7)! </p>
 
 ```{r BCR birds, results='hide', echo= FALSE}
 # generate species detected in park against PIF checklist (does not print)
@@ -486,7 +513,7 @@ GraphOut+
 ```
 </div>
 
-#### Comparison to Regional Trends
+#### Regional Trends
 
 ```{r BBStable, echo= FALSE, results = 'asis', message=FALSE, warning = FALSE, cache = FALSE}
 
@@ -560,7 +587,7 @@ kableExtra::kbl(TableData, escape = FALSE, align= "l", caption = paste0("Compari
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
 
-Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that species' trends in park abundance are generally consistent with trends at the `r params$BCRName` BCR- and state-scales but with a few important exceptions. Of particular importance is the discrepancy in trends of Ovenbird and Red-eyed Vireo, which are declining at the park but appear to be increasing or have stable populations at the state and BCR scales according to BBS. Both of these species are also increasing over a similar time period at monitoring sites across Vermont within the Forest Bird Monitoring Program (Faccio et al. 2017) and at Saint Gaudens NHP in Cornish, NH, which is approximately 20 miles east of MABI. Most of the other abundant species breeding at `r params$Park` are also in decline at the park-, state-, and BCR-scales and with trends of these species recorded from Vermont's Forest Bird Monitoring Program (Faccio et al. 2017), but not all. Overall, this consistency in trends across spatial scales suggests that factors affecting the status of these species are likely occurring at scales beyond the park (e.g., survival during migration, forest maturation, climate change, etc). However, the consistent decline observed since `r params$minYear` of many species at MABI and the discrepancy in trends of Ovenbird and Red-eyed Vireo to the broader region, warrants further investigation into whether park-specific factors may be important. 
+Comparisons of NETN monitoring data in `r params$Park` to the results from the BBS suggest that species' trends in park abundance are generally consistent with trends at the `r params$BCRName` BCR- and state-scales but with a few important exceptions. Of particular importance is the discrepancy in trends of Ovenbird and Red-eyed Vireo, which are declining at the park but appear to be increasing or have stable populations at the state and BCR scales according to BBS. Both of these species are also increasing over a similar time period at monitoring sites across Vermont within the Forest Bird Monitoring Program (Faccio et al. 2017) and at Saint Gaudens NHP in Cornish, NH, which is approximately 20 miles east of MABI. Most of the other common species breeding at `r params$Park` are also in decline at the park-, state-, and BCR-scales. Overall, this consistency in trends across spatial scales suggests that factors affecting the status of these species are likely occurring at scales beyond the park (e.g., survival during migration, forest maturation, land use, climate change, etc). However, the consistent decline observed since `r params$minYear` of many species at MABI and the discrepancy in trends of Ovenbird and Red-eyed Vireo to the broader region, warrants further investigation into whether park-specific factors may be important. 
 
 #### All Species Trends 
 

@@ -153,7 +153,7 @@ mapCols<-colorFactor(c('#55785e','#f5f0b0'), domain = mima_veg_union$simp_veg) #
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r Effmap, echo = FALSE,  fig.height=5.75, fig.width= 5.75, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE,}
 NCRNbirds::mapEffort(BirdData[ParkList == params$Park], palette = "viridis", title = paste0("Total surveys since ",params$minYear))%>% addPolygons(data= mima_veg_union, label = mima_veg_union$simp_veg, weight = 0, smoothFactor = 0.5,opacity = 1.0, fillOpacity = 0.5, fillColor = ~mapCols(simp_veg), group= "Habitat Type") %>% addLegend(data= mima_veg_union, "bottomright", pal = mapCols, values = ~simp_veg,
-    title = "Habitat Type",opacity = .5) %>% addLayersControl(overlayGroups = "Habitat Type", options = layersControlOptions(collapsed = FALSE))
+    title = "Habitat Type",opacity = .5) %>% addLayersControl(overlayGroups = "Habitat Type", options = layersControlOptions(collapsed = FALSE))%>% hideGroup("Habitat Type")
 ```
 <p class='capwrap'>
 Map of monitoring effort (no. surveys) at `r params$Park`'s 24 permanent forest and 6 grassland/open field sites between `r params$minYear` and `r params$maxYear`. You can click on the site to display its unique site identifier and the total number of species detected since `r params$minYear` when the Habitat Type layer (derived from Gawler et al. 2017) is not selected.</p>
@@ -255,7 +255,7 @@ knitr::include_graphics("Fig4.jpg")
 <div style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px">
 ```{r richmap, echo = FALSE,  fig.height=6, fig.width= 6, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE}
 mapRichness(BirdData[ParkList == params$Park], title = "No. of species", palette = "viridis", band = 1:2) %>% addPolygons(data= mima_veg_union, label = mima_veg_union$simp_veg, weight = 0, smoothFactor = 0.5,opacity = 1.0, fillOpacity = 0.5, fillColor = ~mapCols(simp_veg), group= "Habitat Type") %>% addLegend(data= mima_veg_union, "bottomright", pal = mapCols, values = ~simp_veg,
-    title = "Habitat Type",opacity = .5) %>% addLayersControl(overlayGroups = "Habitat Type", options = layersControlOptions(collapsed = FALSE))
+    title = "Habitat Type",opacity = .5) %>% addLayersControl(overlayGroups = "Habitat Type", options = layersControlOptions(collapsed = FALSE))%>% hideGroup("Habitat Type")
 ```
 <p class='capwrap'>
 Map of cumulative bird species richness detected at `r params$Park`'s permanent monitoring sites between `r params$minYear` and `r params$maxYear`. You can click on the site to display its unique site identifier and total number of species detected since `r params$minYear` when the Habitat Type layer (derived from Gawler et al. 2017) is not selected</p>
