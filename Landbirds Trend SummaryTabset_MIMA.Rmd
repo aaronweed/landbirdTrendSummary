@@ -226,7 +226,7 @@ ggplotly(GraphOut)
 ```{r, richPark, echo=F, fig.align = 'left',fig.cap= "Figure 2. Total number of species detected per park during all surveys since monitoring began including detections at grassland sites in MIMA and SARA."}
 
 # rank order for species richness among parks (includes grassland sites)
-plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == params$Park,"yes","no")) %>% filter(Admin_Unit_Code != "SAIR")
+plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == params$Park,"yes","no")) %>% filter(Admin_Unit_Code != "SAIR" & Admin_Unit_Code != "ROVA")
 
 GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,Richness), y= Richness, fill= highlight))+geom_bar(stat = "identity", width=0.75)+
  scale_fill_manual(values =c("#2171b5","forestgreen"), guide=FALSE)+
@@ -474,7 +474,7 @@ Figure 8. Estimated trends in abundance between 2006 to 2019 of the top 10 most 
 
 ##### <b>Trends Across NETN Parks </b>
 
-<p> Trends in the abundance of all species combined across the network has not changed since 2006 (Figure 9a) but the trend varied widely across parks (Figure 9b). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
+<p>The trend in abundance of all species combined across the network has not changed since 2006 (Figure 9a) but the trend varied widely across parks (Figure 9b). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
 
 <p> In parks with significant decreasing or increasing trends, most species generally showed a similar trend to the overall park trend, but often only a fraction of the species-specific trends were significantly different from zero. For example, while the trend analysis indicated that  28 species are in decline at `r params$Park`, only 1 (American Crow) has declined significantly since `r params$minYear` (Figures 8 and 9c). It is important to acknowledge declines in relative abundance even for species with trends that were non-significant because changes in the abundance of rare or less commonly detected species are usually less likely to show statistically significant trends in monitoring data yet are of conservation interest. Hence, lack of statistical significance does not mean that we shouldn't be concerned about species we are seeing fewer of over time -- our methods may not be sensitive enough to detect statistically significant changes. </p>
 
@@ -649,7 +649,7 @@ spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>%
                   mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
                   Nonsig == "TRUE" ~ cell_spec(common2, "html",  bold = F),
                   is.na(Nonsig)~ cell_spec(common2, "html",  bold = F))) %>% 
-  select(`Abundance Rank` = order,`Common Name` = common2, lowCI, Estimate = mean, highCI, `Percent Change` = per_change)
+  select(`Abundance Rank` = order,`Common Name` = common2, Estimate = mean, lowCI,  highCI, `Percent Change` = per_change)
 
 options(knitr.kable.NA = '')
     

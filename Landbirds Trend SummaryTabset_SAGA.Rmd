@@ -71,7 +71,7 @@ ParkCommAnnual <- read.csv("./Data/park-rich-bci-by-year.csv")
 # derive raw relative abundance from NETN monitoring to add on modeled estimates
 
 sp_detects<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T)%>% # raw detection data created from SumRelAbund
-  add_column(variable = "Field Observation") %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
+  add_column(variable = "Field Observation", Admin_Unit_Code = params$Park) %>% select(park= Admin_Unit_Code, Year,  AOU_Code, value= RelAbund, variable) %>% 
   bind_rows(spMeanTrends)
 
 
@@ -124,7 +124,7 @@ Map of monitoring effort (no. surveys) at `r params$Park`'s permanent sites betw
 
 <p> <b>There are three main take-home messages related to bird diversity from our monitoring thus far: </b> </p> 
 <ul>
-<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species have been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the observed average species richness. Total pecies richness at `r params$Park` ranks as #5 among the 10 NETN parks monitored (Figure 2).</li>
+<li> At `r params$Park`, a total of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park])` bird species has been detected between `r params$minYear` to `r params$maxYear` with an average of `r NCRNbirds::birdRichness(BirdData[ParkList == params$Park], byYear = TRUE) %>% dplyr::pull(Richness) %>% mean() %>% round(0)` species detected per year (Figure 1, blue). It is likely that not all species encountered during monitoring breed within the park but the number breeding is close to the observed average species richness. Total pecies richness at `r params$Park` ranks as #5 among the 10 NETN parks monitored (Figure 2).</li>
 <p>
 <li> The number of species has remained <b> unchanged </b> between `r params$minYear` to `r params$maxYear` in `r params$Park` (Figures 1 and 3). It is important to note that the number of <i>estimated</i> species as shown in Figure 1 (green) is typically higher than the actual number detected during monitoring (blue) because not all birds may have been detected during the survey due to imperfect detection (e.g., bird is present but not heard or seen). This was only the case, however, in 2014 and 2019. At `r params$Park` the model actually estimated a lower annual species richness than what was observed because it also accounted for local forest structure (see Doser et al. 2021). The best explanation for why estimated species richness is <b>lower than</b> observed richness in most years is because the bird diversity at `r params$Park` is on average greater than in other network parks with similar forest structure as measured by the regeneration layer, forest cover, and live tree basal area. </li> 
 <p>
@@ -160,7 +160,7 @@ ggplotly(GraphOut)
 ```{r, richPark, echo=F, fig.align = 'left',fig.cap= "Figure 2. Total number of species detected per park during surveys since monitoring began."}
 
 # rank order for species richness among parks
-plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == params$Park,"yes","no")) %>% filter(Admin_Unit_Code != "SAIR")
+plotdata<-NCRNbirds::birdRichness(BirdData, byPark =T) %>% arrange(desc(Richness)) %>% mutate(order= row_number()) %>% mutate(Admin_Unit_Code = fct_reorder(Admin_Unit_Code, order)) %>% mutate(highlight= if_else(Admin_Unit_Code == params$Park,"yes","no")) %>% filter(Admin_Unit_Code != "SAIR" & Admin_Unit_Code != "ROVA")
 
 GraphOut<-ggplot(data=plotdata, aes(x=reorder(Admin_Unit_Code,Richness), y= Richness, fill= highlight))+geom_bar(stat = "identity", width=0.75)+
  scale_fill_manual(values =c("#2171b5","forestgreen"), guide=FALSE)+
@@ -297,7 +297,7 @@ Monitoring the status and trends of breeding birds in `r params$network` parks i
 
 #### Relative Abundance
 
-<p> Relative abundance, expressed as the average of the maximum number of birds detected per site per year from `r params$minYear` to `r params$maxYear`, provides an indication of how often a particular species is observed during monitoring and reflects its population status in the park. Figure 7 shows that the most common species detected at `r params$Park` is a mix of species common to our region and of conservation importance. </p>
+<p> Relative abundance, expressed as the average of the maximum number of birds detected per site per year from `r params$minYear` to `r params$maxYear`, provides an indication of how often a particular species is observed during monitoring and reflects its population status in the park. Figure 7 shows that the most common species detected at `r params$Park` are a mix of species common to our region and of conservation importance. </p>
 
 <p> Bird Conservation Regions (BCRs) are ecologically distinct regions in North America with similar bird communities <a href="https://www.nabci-us.org/"> (www.nabci-us.org)</a>. `r params$Park` is located within the `r params$BCRName` BCR. Within this region, species of regional conservation importance have been designated based on rankings by Partners in Flight (Panjabi et al. 2020). 
 
@@ -407,7 +407,7 @@ Figure 8. Estimated trends in abundance between 2006 to 2019 of the top 10 most 
 
 ##### <b>Trends Across NETN Parks </b>
 
-<p> Trends in the abundance of all species combined across the network has not changed since 2006 (Figure 9A) but the trend varied widely across parks (Figure 9B). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
+<p>The trend in abundance of all species combined across the network has not changed since 2006 (Figure 9A) but the trend varied widely across parks (Figure 9B). For instance, the abundance of all species combined has declined in 3 parks (ACAD, MABI, and MORR) while in SARA, ROVA, and WEFA it has increased over time. Abundance of all species detected in SAGA and MIMA remained the same during this time period. </p>
 
 <p> In parks with significant decreasing or increasing trends, most species generally showed a similar trend to the overall park trend, but often only a fraction of the species-specific trends were significantly different from zero. For example, while the trend analysis indicated that  30 species are in decline at `r params$Park`, only 1 (Ovenbird) was actually a significant decline (Figure 9C). It is important to acknowledge declines in relative abundance even for species with trends that were non-significant in our study. This is because changes in the abundance of rare or less commonly detected species are usually less likely to show statistically significant trends in monitoring data yet are of conservation interest. Hence, lack of statistical significance does not mean that we shouldn't be concerned about species we are seeing fewer of over time -- our methods may not be sensitive enough to detect statistically significant changes.</p>
 
@@ -586,7 +586,7 @@ spp.trend<-filter(spMeanYearEffect, park %in% params$Park) %>%
                   mean < 0 & Nonsig == "FALSE" ~ cell_spec(common2, "html",  bold = T),
                   Nonsig == "TRUE" ~ cell_spec(common2, "html",  bold = F),
                   is.na(Nonsig)~ cell_spec(common2, "html",  bold = F))) %>% 
-  select(`Abundance Rank` = order,`Common Name` = common2, lowCI, Estimate = mean, highCI, `Percent Change` = per_change)
+  select(`Abundance Rank` = order,`Common Name` = common2, Estimate = mean, lowCI,  highCI, `Percent Change` = per_change)
 
 options(knitr.kable.NA = '')# remove NAs from table
     
