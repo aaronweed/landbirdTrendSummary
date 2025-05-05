@@ -1,0 +1,389 @@
+---
+output: 
+    html_document:
+      fig_caption: true
+      css: custom_styles.css
+      includes: 
+        in_header: "header_manual.html" 
+        after_body: "footer.html"
+params:
+  network: NETN
+  Park: SARA
+  state: NY
+  year: 2023
+  bcr: 13
+  BCRName: Lower Great Lakes/St.Lawrence Plain
+  BBSRegion: S13
+  minYear: 2006
+  maxYear: 2023
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# load in packages
+library(magrittr)
+library(devtools)
+library(tidyverse)
+library(NCRNbirds)
+library(leaflet)
+library(cowplot)
+library(readxl)
+library(lubridate)
+library(plotly)
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(RColorBrewer)
+library(sf)
+library(sp)
+library(tmap)
+library(spsurvey)
+library(NPSutils)
+library(paletteer)
+
+##### Import point count data from a Data Package on DataStore #####
+
+# NPSutils::get_data_package(2305911) # downloads package locally - number is the datastore record code
+# dat <- NPSutils::load_data_package(2305911)   #This loads data from downloaded package CSV to a list
+# names(dat) <- gsub("pkg_2305911.", "", names(dat)) #removes first part of column name
+# VIEWS_NETN <- new.env() #creates a new environment
+# list2env(dat, envir = VIEWS_NETN) #moves edited list to the environment
+# rm(dat) #removes dat list since it is no longer needed
+# 
+# NETN.PC<-VIEWS_NETN$MIDN_NCBN_NETN_Landbirds_20240909 %>%  dplyr::filter(GroupCode %in% "NETN")
+
+#NETN.PC %>% filter(UnitCode %in% "SARA" & HabitatType %in% "Grassland") %>%  distinct(PointGroupName)
+
+##### load in network monitoring data and look-up tables #####
+
+BirdData <- importNETNbirds("./Data/NETN") # 
+tlu_Guilds <- read_excel("./Data/GuildMembers_Grassland.xlsx") %>% rename(AOU_Code = AlphaCode)
+# guild_tlu<-getGuilds(BirdData) %>% filter( BCI_Type == "Cent_Appal")%>% rename(Species_Guild = AOU_Code)
+ParkList<-NCRNbirds::getParkNames(BirdData, name.class="code")
+
+PIFSpecies<- read.csv("./Data/PIF_Species_BCR.csv") %>% # import Partners in Flight designations per BCR
+  filter(BCR %in% params$bcr) # filter out species by BCR
+
+
+##### create objects of points specific to habitat or transect #####
+
+site.codes<-getVisits(BirdData[ParkList == params$Park], site="Grassland") %>% select(Point_Name) %>% distinct() %>% pull()
+site.name<-getVisits(BirdData[ParkList == params$Park], site="Grassland") %>% select(Transect_Name) %>% distinct() %>% pull()
+points<-getPoints(BirdData[ParkList == params$Park], point= site.codes) %>% distinct(Transect_Name, Point_Name)
+
+burg<-c("SARA_26_001", "SARA_26_002", "SARA_26_003", "SARA_26_004" ,"SARA_26_005")
+free<- c("SARA_27_001","SARA_27_002", "SARA_27_003", "SARA_27_004", "SARA_27_005","SARA_27_006", "SARA_27_007", "SARA_27_008", "SARA_27_009", "SARA_27_010")
+neil<- c("SARA_28_001","SARA_28_002", "SARA_28_003", "SARA_28_004", "SARA_28_005", "SARA_28_006", "SARA_28_007", "SARA_28_008", "SARA_28_009", "SARA_28_010")
+
+
+##### Generate Relative abundance and Species trend estimates #####
+
+# derive raw relative abundance across all sites for all species
+
+All_sites<- SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T, points = site.codes) %>% # raw detection data created from SumRelAbund
+  add_column(Site = "All grassland sites") 
+
+# # derive raw relative abundance from NETN monitoring for each site
+
+Burg<-SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T, points = burg) %>% add_column(Site = "Burgoyne's Headquarters")
+
+Freeman<-SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T, points = free) %>% add_column(Site = "Freeman Farm")
+
+Neilson<-SumRelAbund(BirdData[ParkList == params$Park], band = 1:2, max= T, points = neil) %>% add_column(Site = "Neilson Farm")
+
+# combine park and site level estimates for each species into one object
+
+SppTrends<-bind_rows(All_sites, Burg, Freeman, Neilson)
+
+##### load in USGS BBS recent survey and analysis results #####
+#  (https://www.sciencebase.gov/catalog/item/5f1836a482cef313ed843104)
+#Sauer, J.R., Link, W.A., and Hines, J.E., 2020, The North American Breeding Bird Survey, Analysis Results 1966 - 2019: U.S. Geological Survey data release, https://doi.org/10.5066/P96A7675.
+
+BBS_trends <- read_excel("BBS trends/BBS_trends.xlsx", sheet = "trend")
+
+
+##### Convenience functions for plotting #####
+
+# species trends
+PlotBySpecies <-function (data, aou, facet, cols =2) {
+  
+ data %>% filter(AOU_Code %in% aou) %>% 
+   ggplot(aes(x = Year, y = RelAbund, color= Site))+expand_limits(y=0)+
+      geom_point(size=2) + 
+      geom_line()+
+      theme_classic()+
+      theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.title.x =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
+      theme(axis.text.x = element_text(color="black", size = 10))+
+      scale_x_continuous(breaks = seq(min(params$minYear), max(params$maxYear),2))+
+      geom_errorbar(aes(ymin=RelAbund-se, ymax=RelAbund+se), width=.6)+
+      scale_color_paletteer_d("nationalparkcolors::Acadia", direction = -1)+
+      labs(title = paste0(data$common[data$AOU_Code %in% aou][1]), y="Mean + SE number of birds detected per point" , color = "", x="")+
+      theme(legend.position = "")+ 
+      theme(legend.text = element_text(size = 12))+
+       theme(plot.title=element_text(size=12, vjust=2, face= "bold")) +
+       theme(strip.background = element_rect(size=10, color="gray", linetype ="solid", fill= "black" ))+
+      theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+
+      facet_wrap(facet, shrink= FALSE, ncol = cols)
+  
+  
+  }
+
+
+# relative abundance (status)
+
+StatusPlot<- function(data, site.name){
+  
+BarChart<-ggplot(data= data, aes(x=reorder(common2,mean), y = mean)) +
+geom_bar(fill="#2171b5", stat="identity",width=0.75) +
+#geom_errorbar(aes(ymin= mean-se, ymax= mean +se), width = .2, color = "#2171b5")+
+coord_flip()+
+geom_text(aes(label = sprintf("%0.2f", round(mean, digits = 2))), hjust = -0.15, color = "black", size = 4)+
+scale_y_continuous(expand = c(0,0),limits = c(0, max(plotdata$mean*1.1)))+ #set origin at 0, sets width of x axis
+xlab("") + labs(title = site.name)+
+ylab("Average number of birds detected per site per year")+ 
+theme_classic()+
+theme(axis.text.y = element_text(color="black",size = 12))+
+theme(axis.text.x = element_text(color="black",size = 12))+
+theme(axis.title.x = element_text(color="black",size = 12, face= "bold"))
+
+BarChart
+}
+```
+
+<img src="NETN_Birdlogo_100.jpg" alt="landbird logo" style="height:100px;width:100.8px;float:right;padding:0;margin:10px -15px 0 0;"/>
+
+## `r getParkNames(BirdData[ParkList == params$Park], name.class = "long")` Grassland Bird Monitoring {.tabset .tabset-fade .tabset-pills}
+
+### Survey Effort
+
+Summary of survey effort of permanent grassland monitoring sites at `r params$Park`
+
+::: {style="float:right;position:relative;top:10px;padding:5px 5px 5px 10px;margin:0px 5px 10px 5px"}
+```{r Effmap, echo = FALSE,  fig.height=6, fig.width= 10, fig.align = 'left', warning= FALSE, comment=FALSE, message=FALSE,}
+
+effort<-
+getVisits(BirdData[ParkList == params$Park], points = site.codes) %>% group_by(Transect_Name, Point_Name) %>% 
+  summarise(Visits = sum(Visit)) %>% left_join(getPoints(BirdData[ParkList == params$Park], points = site.codes))
+
+MapCol<-colorNumeric(palette="viridis",domain=effort$Visits)
+
+BaseMap<- "https://atlas-stg.geoplatform.gov/styles/v1/atlas-user/ck58pyquo009v01p99xebegr9/tiles/256/{z}/{x}/{y}@2x?access_token=pk.eyJ1IjoiYXRsYXMtdXNlciIsImEiOiJjazFmdGx2bjQwMDAwMG5wZmYwbmJwbmE2In0.lWXK2UexpXuyVitesLdwUg"
+ 
+leaflet() %>% addTiles(urlTemplate=BaseMap) %>% 
+  addCircles(data= effort, lng =effort$Longitude, lat = effort$Latitude, color=MapCol(effort$Visits), opacity= 1, radius=30, fillColor = MapCol(effort$Visits), fillOpacity =1, popup=paste(effort$Point_Name,":",as.character(effort$Visits))) %>%
+              addLegend(pal=MapCol, values=effort$Visits, title= paste0("Annual surveys since ",params$minYear), position = "bottomright")
+
+```
+
+<p class="capwrap">
+
+Map of monitoring effort (no. surveys) at `r params$Park`'s 25 permanent grassland/open field sites between `r params$minYear` and `r params$maxYear`. You can click on the site to display the unique site code and the total number of surveys conducted since `r params$minYear`.
+
+</p>
+:::
+
+```{r effort,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+# Survey history
+
+getPoints(BirdData[ParkList == params$Park], points = site.codes) %>% select(Site= Transect_Name, Point_Name) %>% distinct() %>% left_join (summarizeEffort(BirdData[ParkList == params$Park], points = site.codes, byPoint = T), by= "Point_Name") %>% ggplot(data= ., aes(x=Year, y= Point_Name, color = Site))+ geom_point(size =3)+
+  theme_classic()+ labs(y= "Point Name")+ scale_x_continuous(breaks = seq(2006, 2024,2))+
+  theme(legend.position = "top")+scale_y_discrete(limits=rev)
+  
+```
+
+Summary of monitoring effort (dot = survey was conducted) at `r params$Park`'s 25 permanent grassland/open field sites between `r params$minYear` and `r params$maxYear`.
+
+### Species Diversity
+
+Observed number of species at grassland sites over time. Each data point denotes the collective number of unqiue species observed across all sites within an individual bird route or across all sites at the park.
+
+```{r div,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+
+# Species richness over time
+a<-birdRichness(BirdData[ParkList == params$Park], band = 1:2, points = site.codes, byYear = TRUE) %>% 
+ add_column(Site = "All Grassland Sites")
+b<-birdRichness(BirdData[ParkList == params$Park], band = 1:2, points = burg, byYear = TRUE) %>% 
+ add_column(Site = "Burgoyne's (Rt.26)")   
+c<-birdRichness(BirdData[ParkList == params$Park], band = 1:2, points = free, byYear = TRUE) %>% 
+ add_column(Site = "Freeman (Rt.27)")   
+d<-birdRichness(BirdData[ParkList == params$Park], band = 1:2, points = neil, byYear = TRUE) %>% 
+ add_column(Site = "Neilson (Rt.28)")   
+
+graphdata<-bind_rows (a,b,c,d)
+
+ggplot(data=graphdata, aes(x = Year, y = Richness, color = Site))+expand_limits(y=0)+
+      geom_point(size=2) + 
+      geom_line()+
+      theme_classic()+
+      theme(axis.title.y =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.title.x =element_text(size = 14, face ="bold", vjust= 1))+
+      theme(axis.text.y = element_text(color="black", vjust= 0.5,size = 12))+
+      theme(axis.text.x = element_text(color="black", size = 10))+
+      scale_x_continuous(breaks = seq(params$minYear, params$maxYear,2))+
+      scale_color_paletteer_d("nationalparkcolors::Acadia", direction = -1)+
+      labs(y="Number of species detected" , color = "", x="")+
+      theme(legend.position = "")+ 
+      theme(legend.text = element_text(size = 12))+
+      theme(plot.title=element_text(size=12, vjust=2, face= "bold"))+
+      theme(strip.background = element_rect(size=10, color="gray", linetype ="solid", fill= "black" ))+
+      theme(strip.text=element_text(size=12, vjust=0, face= "bold"))+
+      facet_wrap(~Site)
+
+```
+
+### Relative Abundance
+
+<p>Relative abundance, expressed as the average of the maximum number of birds detected per site per year from `r params$minYear` to `r params$maxYear`, provides an indication of how often a particular species is observed during monitoring and reflects its population status in the park. The below figure shows that the most common species detected at `r params$Park` are a mix of species common to our region and of conservation importance (\*).</p>
+
+```{r pop_status,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+### plot relative abundance of top 10
+
+# find AOUs of top 10 most abundant
+aou.10<-SumRelAbund(BirdData[ParkList == params$Park], max=T, sort=TRUE, abund = 10, band = 1:2, points = site.codes)$AOU_Code # get Top 10 most abundant species (birds/point)
+
+spp.10<-getBirdNames(BirdData[ParkList == params$Park], names= aou.10, out.style = "common") %>% 
+    bind_cols(.,aou.10 ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2) %>% 
+    mutate(order= row_number()) %>% 
+    mutate(`Common Name` = common) %>% 
+    mutate(common = paste0(common, " (", order,")")) %>% 
+    mutate(common = fct_reorder(common, order)) 
+
+plotdata<-SumRelAbund(BirdData[ParkList == params$Park], max=T, AOU = aou.10, band = 1:2, CalcByYear =FALSE, points = site.codes) %>% 
+  group_by(AOU_Code) %>% 
+  summarise(mean = round(mean(RelAbund,na.rm=T),2), se = sd(RelAbund)/sqrt(n()), n= n()) %>% 
+  left_join(spp.10,., by = "AOU_Code") %>% 
+  left_join(.,PIFSpecies, by= "AOU_Code") %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), common, paste(PIF,"",common))) %>% 
+  mutate(common2 = fct_reorder(common2, mean))
+  
+StatusPlot(plotdata, site.name = "All grassland sites")
+```
+
+Relative abundance of the 10 most commonly detected species at `r params$Park` grassland sites. Data summaries include all species detected at monitoring sites. Relative abundance is calculated as the maximum number of detections per species among visits to all sites in a year divided by the total number of sites monitored from `r params$minYear` to `r params$maxYear`. Asterisks next to a species name denote species designated by Partners in Flight to be of conservation importance within the `r params$BCRName` BCR (Panjabi et al. 2020)
+
+### Trends {.tabset}
+
+#### All Species
+
+Observed relative abundance of all birds over time. Data summaries include all species heard at sites including some that are not suspected to be breeding in the grasslands but likley to be in the surrounding habitats. The horizontal axis indicates the survey year, with the number of points monitored in parenthesis.
+
+```{r pop_trendsAll,echo=FALSE,results='hide', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+#### Plot abundance of top 10 species
+
+# All species over time
+
+detectsPlot(BirdData[ParkList == params$Park], band = 1:2, max= T, se= TRUE)
+
+
+```
+
+#### 10 Most Common Species
+
+```{r pop_trendsTop10,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+
+# Top 10 most abundant
+Top10<-left_join(spp.10,SppTrends, by="AOU_Code")
+ 
+map(.x= spp.10$AOU_Code, ~PlotBySpecies(data=Top10, aou= .x,  facet= "Site"))
+
+#coverplots<-ggpubr::ggarrange(plotlist =Cover_plots, nrow=1, ncol =1, align = "hv", common.legend = TRUE)
+
+```
+
+#### Obligate Grassland Breeders
+
+```{r pop_trendsGrasslands,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+# By guild
+  
+  aous<- getChecklist(BirdData[ParkList == params$Park], out.style = "AOU", points = site.codes) 
+  
+  spp<-getBirdNames(BirdData[ParkList == params$Park], names= aous , out.style = "common") %>% 
+    bind_cols(.,aous ) %>% as_tibble() %>% rename(common = 1, AOU_Code =2)
+
+  Guild.Abund <- left_join(spp,SppTrends, by= "AOU_Code") %>% 
+    left_join(., tlu_Guilds, by="AOU_Code", relationship="many-to-many") %>% filter(!is.na(Guild))
+  
+  
+  map(.x= unique(filter(Guild.Abund, Guild %in% "Grassland Obligate")$AOU_Code), ~PlotBySpecies(data= filter(Guild.Abund, Guild %in% "Grassland Obligate"), aou= .x,  facet= "Site"))
+  
+
+```
+
+#### Shrub-dependent
+
+```{r pop_trendsShrub,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+map(.x= unique(filter(Guild.Abund, Guild %in% "Shrub-dependent")$AOU_Code), ~PlotBySpecies(data= filter(Guild.Abund, Guild %in% "Shrub-dependent"), aou= .x,  facet= "Site"))
+
+```
+
+#### Edge Generalist
+
+```{r pop_trendsEdge,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+
+map(.x= unique(filter(Guild.Abund, Guild %in% "Edge Generalist")$AOU_Code), ~PlotBySpecies(data= filter(Guild.Abund, Guild %in% "Edge Generalist"), aou= .x,  facet= "Site"))
+ 
+```
+
+#### Exotic
+
+```{r pop_trendsExotic,echo=FALSE,results='hide',fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+map(.x= unique(filter(Guild.Abund, Guild %in% "Exotic")$AOU_Code), ~PlotBySpecies(data= filter(Guild.Abund, Guild %in% "Exotic"), aou= .x,  facet= "Site"))
+
+```
+
+<!-- #### Partners in Flight Species of Conservation Importance -->
+
+<!-- ```{r pop_trendsPIF,echo=FALSE,fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA} -->
+
+<!-- # PIF  -->
+
+<!-- PIF.Abund <-left_join(PIFSpecies, SppTrends,  by="AOU_Code") %>% rename(common = Common_Name)  -->
+
+<!-- map(.x= PIFSpecies$AOU_Code, ~PlotBySpecies(data=PIF.Abund, aou= .x,  facet= "Site")) -->
+
+<!-- ``` -->
+
+### Species list
+
+```{r list,echo=FALSE,fig.keep='all', cache= FALSE,  fig.height=6, fig.width= 8, fig.align = 'center', message=FALSE,warning = FALSE, comment=NA}
+
+# generate species detected on route and denote those  on the PIF checklist (does not print)
+
+PIFSpecies.Burg<- getChecklist(BirdData[ParkList == params$Park], out.style = "common", band=1:2, points = burg) %>% 
+as.data.frame() %>% rename(Common_Name = 1) %>% add_column(Site= "Burgoyne's Headquarter")
+
+PIFSpecies.Free<- getChecklist(BirdData[ParkList == params$Park], out.style = "common", band=1:2, points = free) %>% 
+as.data.frame() %>% rename(Common_Name = 1) %>% add_column(Site= "Freeman Farm")
+
+PIFSpecies.Neil<- getChecklist(BirdData[ParkList == params$Park], out.style = "common", band=1:2, points = neil) %>% 
+as.data.frame() %>% rename(Common_Name = 1) %>% add_column(Site= "Neilson Farm")
+
+spplist<- bind_rows(PIFSpecies.Burg, PIFSpecies.Free, PIFSpecies.Neil) %>% 
+  dplyr::left_join(y=PIFSpecies, by="Common_Name") %>% # add PIF Designations
+  mutate(PIF=  if_else(Regional.Importance == 1,"\\*","")) %>% 
+  mutate(common2 = if_else(is.na(PIF), Common_Name, paste(PIF,"",Common_Name))) %>% arrange(Common_Name) %>% select(`Common Name` = common2, Site) %>% add_column(Present = "X") %>% pivot_wider(id_cols= `Common Name`, names_from = Site, values_from = Present, values_fill = "") 
+ 
+kableExtra::kbl(spplist, escape = FALSE, align= "l", caption = paste0("List of species detected among grassland sites at ", params$Park, " between ", params$minYear, " to ", params$maxYear, ". Asterisks denote species designated by Partners in Flight to be of conservation importance within the ", params$BCRName, " BCR (Panjabi et al. 2020)"))%>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
+
+```
+
+<!-- ### Conclusions -->
+
+### Supporting Resources
+
+```{r, results='asis', echo=F}
+cat(readLines(paste0("Citations_",params$Park, ".html")))
+```
